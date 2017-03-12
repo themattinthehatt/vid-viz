@@ -90,3 +90,4 @@ ENV/
 
 # matlab temp files
 *~
+data/*
