@@ -23,15 +23,15 @@ class Threshold(object):
 
     def __init__(self):
 
+        # user option constants
+        self.MAX_NUM_THRESH_STYLES = 2
+        self.MAX_NUM_CHAN_STYLES = 4
+
         # user options
         self.style = 0                          # maps to THRESH_TYPE
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
-
-        # user option constants
-        self.MAX_NUM_THRESH_STYLES = 2
-        self.MAX_NUM_CHAN_STYLES = 4
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
@@ -68,13 +68,6 @@ class Threshold(object):
         elif self.style == 1:
             self.THRESH_TYPE = cv2.THRESH_BINARY_INV
 
-        """ 
-        Channel styles:
-            0 - original channel values
-            1 - all pixels set to 0
-            2 - all pixels set to 255
-            3 - thresholded grayscale image
-        """
         for chan in range(3):
             if self.use_chan[chan]:
                 for chan_style in range(self.MAX_NUM_CHAN_STYLES):
@@ -123,14 +116,6 @@ class Alien(object):
 
     def __init__(self):
 
-        # user options
-        self.style = 0                          # maps to THRESH_TYPE
-        self.optimize = 1                       # skips a smoothing step
-        self.use_chan = [False, False, False]   # rgb channel selector
-        self.chan_style = [0, 0, 0]             # effect selector for each chan
-        self.chan_freq = [0.2, 0.2, 0.2]        # current freq for each chan
-        self.chan_phase = [0, 0, 0]             # current phase for each chan
-
         # user option constants
         self.FREQ_MIN = 0
         self.FREQ_MAX = 10
@@ -139,6 +124,14 @@ class Alien(object):
         self.PHASE_MAX = 2 * np.pi
         self.PHASE_INC = np.pi / 10.0
         self.MAX_NUM_CHAN_STYLES = 4
+
+        # user options
+        self.style = 0                          # maps to THRESH_TYPE
+        self.optimize = 1                       # skips a smoothing step
+        self.use_chan = [False, False, False]   # rgb channel selector
+        self.chan_style = [0, 0, 0]             # effect selector for each chan
+        self.chan_freq = [0.2, 0.2, 0.2]        # current freq for each chan
+        self.chan_phase = [0, 0, 0]             # current phase for each chan
 
         # key press parameters
         self.INC0 = False
@@ -182,13 +175,7 @@ class Alien(object):
             key_list[ord('R')] = False
             self.INC1 = True
 
-        """ 
-        Channel styles:
-            0 - original channel values
-            1 - all pixels set to 0
-            2 - all pixels set to 255
-            3 - cos applied to channel
-        """
+        # process options
         for chan in range(3):
             if self.use_chan[chan]:
                 # update channel style
@@ -198,23 +185,23 @@ class Alien(object):
                         key_list[ord(str(chan_style))] = False
                 # update channel freq
                 if self.DEC0:
-                    self.chan_freq[chan] -= self.FREQ_INC
                     self.DEC0 = False
+                    self.chan_freq[chan] -= self.FREQ_INC
                 if self.INC0:
-                    self.chan_freq[chan] += self.FREQ_INC
                     self.INC0 = False
+                    self.chan_freq[chan] += self.FREQ_INC
                 self.chan_freq[chan] = np.clip(self.chan_freq[chan],
                                                self.FREQ_MIN,
                                                self.FREQ_MAX)
                 # update channel phase
                 if self.DEC1:
+                    self.DEC1 = False
                     self.chan_phase[chan] = (self.chan_phase[chan] -
                                              self.PHASE_INC) % self.PHASE_MAX
-                    self.DEC1 = False
                 if self.INC1:
+                    self.INC1 = False
                     self.chan_phase[chan] = (self.chan_phase[chan] +
                                              self.PHASE_INC) % self.PHASE_MAX
-                    self.INC1 = False
 
         # process image
         frame = cv2.GaussianBlur(frame, (11, 11), 0)
@@ -225,7 +212,7 @@ class Alien(object):
         for chan in range(3):
             if self.chan_style[chan] == 0:
                 frame[:, :, chan] = frame_orig[:, :, chan]
-            if self.chan_style[chan] == 1:
+            elif self.chan_style[chan] == 1:
                 frame[:, :, chan] = 0
             elif self.chan_style[chan] == 2:
                 frame[:, :, chan] = 255
@@ -287,5 +274,171 @@ class Alien(object):
         #                                      self.THRESH_TYPE,
         #                                      self.THRESH_BLOCK,
         #                                      self.THRESH_C)
+
+        return frame
+
+
+class Border(object):
+    """
+    Manipulate image borders
+
+    KEYBOARD INPUTS:
+        0-9 select border effect
+        q - quit border effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        self.MAX_NUM_BORDER_STYLES = 3
+        self.height_mult = 0.5
+        self.width_mult = 0.5
+        self.mult_inc = 0.05
+
+        # user options
+        self.style = 0
+
+        # key press parameters
+        self.INC0 = False
+        self.DEC0 = False
+        self.INC1 = False
+        self.DEC1 = False
+
+    def process(self, frame, key_list):
+
+        # process keyboard input
+        if key_list[ord('n')]:
+            key_list[ord('n')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_BORDER_STYLES
+        elif key_list[ord('-')]:
+            key_list[ord('-')] = False
+            self.DEC0 = True
+        elif key_list[ord('=')]:
+            key_list[ord('=')] = False
+            self.INC0 = True
+        elif key_list[ord('T')]:
+            key_list[ord('T')] = False
+            self.DEC1 = True
+        elif key_list[ord('R')]:
+            key_list[ord('R')] = False
+            self.INC1 = True
+
+        # process options
+        if self.DEC0:
+            self.DEC0 = False
+            self.height_mult -= self.mult_inc
+            if self.height_mult < 0:
+                self.height_mult = 0
+            self.width_mult -= self.mult_inc
+            if self.width_mult < 0:
+                self.width_mult = 0
+        if self.INC0:
+            self.INC0 = False
+            self.height_mult += self.mult_inc
+            self.width_mult += self.width_mult
+
+        # process image
+        [im_height, im_width, im_channels] = frame.shape
+
+        if self.style == 1:
+            # top, bottom, left, right
+            frame = cv2.copyMakeBorder(frame,
+                                       int(im_height * self.height_mult),
+                                       int(im_height * self.height_mult),
+                                       int(im_width * self.width_mult),
+                                       int(im_width * self.width_mult),
+                                       cv2.BORDER_WRAP)
+        elif self.style == 2:
+            # top, bottom, left, right
+            frame = cv2.copyMakeBorder(frame,
+                                       int(im_height * 2 * self.height_mult),
+                                       0,
+                                       int(im_width * 2 * self.width_mult),
+                                       0,
+                                       cv2.BORDER_REFLECT)
+
+        return frame
+
+
+class RGBWalk(object):
+    """
+    Use outline from grayscale thresholding in each of randomly drifting color
+    channels
+
+    KEYBOARD INPUTS:
+        / - reset random walk
+        q - quit threshold effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        self.STEP_SIZE_MIN = 0.5
+        self.STEP_SIZE_MAX = 15.0
+        self.STEP_SIZE_INC = 1.0
+        self.NUM_SAMPLES = 10               # samples to avg to smooth walk
+
+        # user options
+        self.step_size = 5.0                # step size of random walk (pixels)
+        self.reinitialize = False           # reset random walk
+        self.noise_index = 0                # counter in noise array
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise_samples = np.random.randn(self.NUM_SAMPLES, 6)
+
+        # key press parameters
+        self.INC0 = False
+        self.DEC0 = False
+        self.INC1 = False
+        self.DEC1 = False
+
+    def process(self, frame, key_list):
+
+        # process keyboard input
+        if key_list[ord('-')]:
+            key_list[ord('-')] = False
+            self.DEC0 = True
+        elif key_list[ord('=')]:
+            key_list[ord('=')] = False
+            self.INC0 = True
+        elif key_list[ord('/')]:
+            key_list[ord('/')] = False
+            self.reinitialize = True
+
+        # process options
+        if self.DEC0:
+            self.DEC0 = False
+            self.step_size -= self.STEP_SIZE_INC
+        if self.INC0:
+            self.INC0 = False
+            self.step_size += self.STEP_SIZE_INC
+        self.step_size = np.clip(self.step_size,
+                                 self.STEP_SIZE_MIN, self.STEP_SIZE_MAX)
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise_samples = np.random.randn(self.NUM_SAMPLES,
+                                                 6)  # x, y for RGB channels
+
+        # process image
+        [im_height, im_width, im_channels] = frame.shape
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame_gray = cv2.adaptiveThreshold(frame_gray, 255,
+                                           cv2.ADAPTIVE_THRESH_MEAN_C,
+                                           cv2.THRESH_BINARY_INV, 15, 5)
+        frame_gray = cv2.medianBlur(frame_gray, 7)
+
+        # update noise values
+        self.noise_samples[self.noise_index, :] = np.random.randn(1, 6)
+        self.noise_index = (self.noise_index + 1) % self.NUM_SAMPLES
+        self.chan_vec_pos += np.reshape(
+            self.step_size * np.mean(self.noise_samples, axis=0), (3, 2))
+
+        # translate image
+        for chan in range(3):
+            frame[:, :, chan] = cv2.warpAffine(
+                frame_gray,
+                np.float32([[1, 0, self.chan_vec_pos[chan, 0]],
+                            [0, 1, self.chan_vec_pos[chan, 1]]]),
+                (im_width, im_height))
 
         return frame
