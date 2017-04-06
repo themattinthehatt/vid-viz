@@ -16,6 +16,88 @@ class Effect(object):
         raise NotImplementedError
 
 
+class Border(Effect):
+    """
+    Manipulate image borders
+
+    KEYBOARD INPUTS:
+        0-9 select border effect
+        q - quit border effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        self.MAX_NUM_BORDER_STYLES = 3
+        self.height_mult = 0.5
+        self.width_mult = 0.5
+        self.mult_inc = 0.05
+
+        # user options
+        self.style = 0
+
+        # key press parameters
+        self.INC0 = False
+        self.DEC0 = False
+        self.INC1 = False
+        self.DEC1 = False
+
+    def process(self, frame, key_list):
+
+        # process keyboard input
+        if key_list[ord('n')]:
+            key_list[ord('n')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_BORDER_STYLES
+        elif key_list[ord('-')]:
+            key_list[ord('-')] = False
+            self.DEC0 = True
+        elif key_list[ord('=')]:
+            key_list[ord('=')] = False
+            self.INC0 = True
+        elif key_list[ord('T')]:
+            key_list[ord('T')] = False
+            self.DEC1 = True
+        elif key_list[ord('R')]:
+            key_list[ord('R')] = False
+            self.INC1 = True
+
+        # process options
+        if self.DEC0:
+            self.DEC0 = False
+            self.height_mult -= self.mult_inc
+            if self.height_mult < 0:
+                self.height_mult = 0
+            self.width_mult -= self.mult_inc
+            if self.width_mult < 0:
+                self.width_mult = 0
+        if self.INC0:
+            self.INC0 = False
+            self.height_mult += self.mult_inc
+            self.width_mult += self.width_mult
+
+        # process image
+        [im_height, im_width, im_channels] = frame.shape
+
+        if self.style == 1:
+            # top, bottom, left, right
+            frame = cv2.copyMakeBorder(frame,
+                                       int(im_height * self.height_mult),
+                                       int(im_height * self.height_mult),
+                                       int(im_width * self.width_mult),
+                                       int(im_width * self.width_mult),
+                                       cv2.BORDER_WRAP)
+        elif self.style == 2:
+            # top, bottom, left, right
+            frame = cv2.copyMakeBorder(frame,
+                                       int(im_height * 2 * self.height_mult),
+                                       0,
+                                       int(im_width * 2 * self.width_mult),
+                                       0,
+                                       cv2.BORDER_REFLECT)
+
+        return frame
+
+
 class Threshold(Effect):
     """
     Threshold individual channels in RGB frame
@@ -26,7 +108,7 @@ class Threshold(Effect):
         1 - selected channel uses all pixels as 0
         2 - selected channel uses all pixels as 255
         3 - selected channel uses threshold effect
-        y - toggle between threshold styles
+        t - toggle between threshold styles
         q - quit threshold effect
     """
 
@@ -67,8 +149,8 @@ class Threshold(Effect):
             self.use_chan[0] = False
             self.use_chan[1] = False
             self.use_chan[2] = True
-        elif key_list[ord('y')]:
-            key_list[ord('y')] = False
+        elif key_list[ord('t')]:
+            key_list[ord('t')] = False
             self.style = (self.style + 1) % self.MAX_NUM_THRESH_STYLES
 
         # process options
@@ -287,88 +369,6 @@ class Alien(Effect):
         return frame
 
 
-class Border(Effect):
-    """
-    Manipulate image borders
-
-    KEYBOARD INPUTS:
-        0-9 select border effect
-        q - quit border effect
-    """
-
-    def __init__(self):
-
-        # user option constants
-        self.MAX_NUM_BORDER_STYLES = 3
-        self.height_mult = 0.5
-        self.width_mult = 0.5
-        self.mult_inc = 0.05
-
-        # user options
-        self.style = 0
-
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
-
-    def process(self, frame, key_list):
-
-        # process keyboard input
-        if key_list[ord('n')]:
-            key_list[ord('n')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_BORDER_STYLES
-        elif key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('T')]:
-            key_list[ord('T')] = False
-            self.DEC1 = True
-        elif key_list[ord('R')]:
-            key_list[ord('R')] = False
-            self.INC1 = True
-
-        # process options
-        if self.DEC0:
-            self.DEC0 = False
-            self.height_mult -= self.mult_inc
-            if self.height_mult < 0:
-                self.height_mult = 0
-            self.width_mult -= self.mult_inc
-            if self.width_mult < 0:
-                self.width_mult = 0
-        if self.INC0:
-            self.INC0 = False
-            self.height_mult += self.mult_inc
-            self.width_mult += self.width_mult
-
-        # process image
-        [im_height, im_width, im_channels] = frame.shape
-
-        if self.style == 1:
-            # top, bottom, left, right
-            frame = cv2.copyMakeBorder(frame,
-                                       int(im_height * self.height_mult),
-                                       int(im_height * self.height_mult),
-                                       int(im_width * self.width_mult),
-                                       int(im_width * self.width_mult),
-                                       cv2.BORDER_WRAP)
-        elif self.style == 2:
-            # top, bottom, left, right
-            frame = cv2.copyMakeBorder(frame,
-                                       int(im_height * 2 * self.height_mult),
-                                       0,
-                                       int(im_width * 2 * self.width_mult),
-                                       0,
-                                       cv2.BORDER_REFLECT)
-
-        return frame
-
-
 class RGBWalk(Effect):
     """
     Use outline from grayscale thresholding in each of randomly drifting color
@@ -376,8 +376,9 @@ class RGBWalk(Effect):
 
     KEYBOARD INPUTS:
         / - reset random walk
+        t - toggle between effect types 
         -/+ - decrease/increase random walk step size
-        q - quit threshold effect
+        q - quit rgbwalk effect
     """
 
     def __init__(self):
@@ -386,8 +387,10 @@ class RGBWalk(Effect):
         self.STEP_SIZE_MIN = 0.5
         self.STEP_SIZE_MAX = 15.0
         self.STEP_SIZE_INC = 1.0
+        self.MAX_NUM_STYLES = 2
 
         # user options
+        self.style = 0
         self.step_size = 5.0                # step size of random walk (pixels)
         self.reinitialize = False           # reset random walk
         self.chan_vec_pos = np.zeros((3, 2))
@@ -410,6 +413,10 @@ class RGBWalk(Effect):
             self.INC0 = True
         elif key_list[ord('/')]:
             key_list[ord('/')] = False
+            self.reinitialize = True
+        elif key_list[ord('t')]:
+            key_list[ord('t')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_STYLES
             self.reinitialize = True
 
         # process options
@@ -438,12 +445,27 @@ class RGBWalk(Effect):
         self.chan_vec_pos += np.reshape(
             self.step_size * self.noise.get_next_vals(), (3, 2))
 
-        # translate image
-        for chan in range(3):
-            frame[:, :, chan] = cv2.warpAffine(
-                frame_gray,
-                np.float32([[1, 0, self.chan_vec_pos[chan, 0]],
-                            [0, 1, self.chan_vec_pos[chan, 1]]]),
-                (im_width, im_height))
+        # translate channels
+        if self.style == 0:
+
+            for chan in range(3):
+                frame[:, :, chan] = cv2.warpAffine(
+                    frame_gray,
+                    np.float32([[1, 0, self.chan_vec_pos[chan, 0]],
+                                [0, 1, self.chan_vec_pos[chan, 1]]]),
+                    (im_width, im_height))
+
+        elif self.style == 1:
+
+            x_dir = self.chan_vec_pos[0, 1]
+            y_dir = self.chan_vec_pos[1, 1]
+            norm_dirs = [x_dir, y_dir] / np.linalg.norm([x_dir, y_dir])
+            for chan in range(3):
+                step_len = 0.1 * self.step_size * self.chan_vec_pos[chan, 0]
+                frame[:, :, chan] = cv2.warpAffine(
+                    frame_gray,
+                    np.float32([[1, 0, x_dir + step_len * norm_dirs[0]],
+                                [0, 1, y_dir + step_len * norm_dirs[1]]]),
+                    (im_width, im_height))
 
         return frame
