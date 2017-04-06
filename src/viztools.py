@@ -3,11 +3,20 @@ from __future__ import print_function
 import cv2
 import numpy as np
 
+import utils as util
+
 
 KEY_BS = 8
 
 
-class Threshold(object):
+class Effect(object):
+    """Base class for vid-viz effects"""
+
+    def process(self, frame, key_list):
+        raise NotImplementedError
+
+
+class Threshold(Effect):
     """
     Threshold individual channels in RGB frame
     
@@ -98,7 +107,7 @@ class Threshold(object):
         return frame
 
 
-class Alien(object):
+class Alien(Effect):
     """
     Effect found in GIMP:Colors > Map > Alien Map
 
@@ -278,7 +287,7 @@ class Alien(object):
         return frame
 
 
-class Border(object):
+class Border(Effect):
     """
     Manipulate image borders
 
@@ -360,13 +369,14 @@ class Border(object):
         return frame
 
 
-class RGBWalk(object):
+class RGBWalk(Effect):
     """
     Use outline from grayscale thresholding in each of randomly drifting color
     channels
 
     KEYBOARD INPUTS:
         / - reset random walk
+        -/+ - decrease/increase random walk step size
         q - quit threshold effect
     """
 
@@ -376,14 +386,12 @@ class RGBWalk(object):
         self.STEP_SIZE_MIN = 0.5
         self.STEP_SIZE_MAX = 15.0
         self.STEP_SIZE_INC = 1.0
-        self.NUM_SAMPLES = 10               # samples to avg to smooth walk
 
         # user options
         self.step_size = 5.0                # step size of random walk (pixels)
         self.reinitialize = False           # reset random walk
-        self.noise_index = 0                # counter in noise array
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise_samples = np.random.randn(self.NUM_SAMPLES, 6)
+        self.noise = util.SmoothNoise(num_samples=10, num_channels=6)
 
         # key press parameters
         self.INC0 = False
@@ -416,8 +424,7 @@ class RGBWalk(object):
         if self.reinitialize:
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((3, 2))
-            self.noise_samples = np.random.randn(self.NUM_SAMPLES,
-                                                 6)  # x, y for RGB channels
+            self.noise.reinitialize()
 
         # process image
         [im_height, im_width, im_channels] = frame.shape
@@ -428,10 +435,8 @@ class RGBWalk(object):
         frame_gray = cv2.medianBlur(frame_gray, 7)
 
         # update noise values
-        self.noise_samples[self.noise_index, :] = np.random.randn(1, 6)
-        self.noise_index = (self.noise_index + 1) % self.NUM_SAMPLES
         self.chan_vec_pos += np.reshape(
-            self.step_size * np.mean(self.noise_samples, axis=0), (3, 2))
+            self.step_size * self.noise.get_next_vals(), (3, 2))
 
         # translate image
         for chan in range(3):
