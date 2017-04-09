@@ -480,8 +480,8 @@ class RGBBurst(Effect):
         t - toggle between effect types
         w - togglel random walk
         -/+ - decrease/increase interval at which burst takes place
-        [/] - decrease/increase frame decay rate
-        ;/' - decrease/increase frame expansion rate
+        [/] - decrease/increase frame decay rate (apparent speed)
+        ;/' - decrease/increase frame expansion rate (tail length)
         / - reset parameters
         q - quit rgbburst effect
     """
