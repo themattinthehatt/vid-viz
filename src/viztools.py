@@ -6,9 +6,6 @@ import numpy as np
 import utils as util
 
 
-KEY_BS = 8
-
-
 class Effect(object):
     """Base class for vid-viz effects"""
 
@@ -478,7 +475,7 @@ class RGBBurst(Effect):
 
     KEYBOARD INPUTS:
         t - toggle between effect types
-        w - togglel random walk
+        w - toggle random walk
         -/+ - decrease/increase interval at which burst takes place
         [/] - decrease/increase frame decay rate (apparent speed)
         ;/' - decrease/increase frame expansion rate (tail length)
@@ -663,3 +660,161 @@ class RGBBurst(Effect):
             self.frame += frame
 
         return frame_ret
+
+
+class Mask(Effect):
+    """
+    Manipulate mask on image
+
+    KEYBOARD INPUTS:
+        t - toggle between mask and inverse
+        w - toggle random walk
+        -/+ - decrease/increase adaptive threshold kernel size
+        [/] - decrease/increase median blur kernel size
+        ;/' - decrease/increase ?
+        / - reset parameters
+        q - quit mask effect
+    """
+
+    def __init__(self):
+
+        # background frame constants
+        self.THRESH_KERN_INIT = 15
+        self.THRESH_KERN_MIN = 3
+        self.THRESH_KERN_MAX = 75
+        self.THRESH_KERN_INC = 2
+        self.MEDIAN_KERN_INIT = 7
+        self.MEDIAN_KERN_MIN = 3
+        self.MEDIAN_KERN_MAX = 75
+        self.MEDIAN_KERN_INC = 2
+        # self.FRAME_EXP_RATE_INIT = 1.1
+        # self.FRAME_EXP_RATE_MIN = 1.01
+        # self.FRAME_EXP_RATE_MAX = 2.0
+        # self.FRAME_EXP_RATE_INC = 0.01
+        self.MAX_NUM_STYLES = 2
+
+        # user options
+        self.style = 0
+        self.thresh_kern = self.THRESH_KERN_INIT
+        self.median_kern = self.MEDIAN_KERN_INIT
+        self.step_size = 3.0                # step size of random walk (pixels)
+        self.reinitialize = False           # reset random walk
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(num_samples=10, num_channels=6)
+
+        # key press parameters
+        self.INC0 = False
+        self.DEC0 = False
+        self.INC1 = False
+        self.DEC1 = False
+        self.INC2 = False
+        self.DEC2 = False
+
+    def _process_io(self, key_list):
+
+        if key_list[ord('-')]:
+            key_list[ord('-')] = False
+            self.DEC0 = True
+        elif key_list[ord('=')]:
+            key_list[ord('=')] = False
+            self.INC0 = True
+        elif key_list[ord('[')]:
+            key_list[ord('[')] = False
+            self.DEC1 = True
+        elif key_list[ord(']')]:
+            key_list[ord(']')] = False
+            self.INC1 = True
+        elif key_list[ord(';')]:
+            key_list[ord(';')] = False
+            self.DEC2 = True
+        elif key_list[ord('\'')]:
+            key_list[ord('\'')] = False
+            self.INC2 = True
+        elif key_list[ord('/')]:
+            key_list[ord('/')] = False
+            self.reinitialize = True
+        elif key_list[ord('t')]:
+            key_list[ord('t')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_STYLES
+            self.reinitialize = True
+        elif key_list[ord('w')]:
+            key_list[ord('w')] = False
+            self.random_walk = not self.random_walk
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+
+        # process options
+        if self.DEC0:
+            self.DEC0 = False
+            self.thresh_kern -= self.THRESH_KERN_INC
+        if self.INC0:
+            self.INC0 = False
+            self.thresh_kern += self.THRESH_KERN_INC
+        self.thresh_kern = np.clip(self.thresh_kern,
+                                   self.THRESH_KERN_MIN,
+                                   self.THRESH_KERN_MAX)
+
+        if self.DEC1:
+            self.DEC1 = False
+            self.median_kern -= self.MEDIAN_KERN_INC
+        if self.INC1:
+            self.INC1 = False
+            self.median_kern += self.MEDIAN_KERN_INC
+        self.median_kern = np.clip(self.median_kern,
+                                   self.MEDIAN_KERN_MIN,
+                                   self.MEDIAN_KERN_MAX)
+
+        # if self.DEC2:
+        #     self.DEC2 = False
+        #     self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
+        # if self.INC2:
+        #     self.INC2 = False
+        #     self.frame_exp_rate += self.FRAME_EXP_RATE_INC
+        # self.frame_exp_rate = np.clip(self.frame_exp_rate,
+        #                               self.FRAME_EXP_RATE_MIN,
+        #                               self.FRAME_EXP_RATE_MAX)
+
+    def process(self, frame_orig, key_list):
+
+        frame = np.copy(frame_orig)
+
+        # process keyboard input
+        self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.thresh_kern = self.THRESH_KERN_INIT
+            self.median_kern = self.MEDIAN_KERN_INIT
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+
+        # process image
+        [im_height, im_width, _] = frame.shape
+
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if self.style == 0:
+            frame = cv2.adaptiveThreshold(frame_gray,
+                                          255,
+                                          cv2.ADAPTIVE_THRESH_MEAN_C,
+                                          cv2.THRESH_BINARY_INV,
+                                          self.thresh_kern,
+                                          5)
+        elif self.style == 1:
+            frame = cv2.adaptiveThreshold(frame_gray,
+                                          255,
+                                          cv2.ADAPTIVE_THRESH_MEAN_C,
+                                          cv2.THRESH_BINARY,
+                                          self.thresh_kern,
+                                          5)
+        frame = cv2.medianBlur(frame, self.median_kern)
+
+        # random walk
+        if self.random_walk:
+            frame = cv2.warpAffine(
+                frame,
+                np.float32([[1, 0, self.chan_vec_pos[0, 0]],
+                            [0, 1, self.chan_vec_pos[0, 1]]]),
+                (im_width, im_height))
+
+        return frame
