@@ -18,7 +18,10 @@ class Border(Effect):
     Manipulate image borders
 
     KEYBOARD INPUTS:
-        0-9 select border effect
+        t - toggle between border styles
+        -/+ - decrease/increase image size
+        [/] - rotate image left/right
+        lrud arrows - translate image
         q - quit border effect
     """
 
@@ -29,15 +32,22 @@ class Border(Effect):
         self.MULT_FACTOR_MIN = 0.01
         self.MULT_FACTOR_MAX = 10.0
         self.MULT_FACTOR_INC = 0.05
-        # self.MEDIAN_KERN_INIT = 7
-        # self.MEDIAN_KERN_MIN = 3
-        # self.MEDIAN_KERN_MAX = 75
-        # self.MEDIAN_KERN_INC = 2
+        self.ROT_ANGLE_INIT = 0
+        self.ROT_ANGLE_MIN = -360
+        self.ROT_ANGLE_MAX = 360
+        self.ROT_ANGLE_INC = 5
+        self.SHIFT_PIX_INIT = 0
+        self.SHIFT_PIX_MIN = -500
+        self.SHIFT_PIX_MAX = 500
+        self.SHIFT_PIX_INC = 10
         self.MAX_NUM_STYLES = 3
 
         # user options
         self.style = 0
         self.mult_factor = self.MULT_FACTOR_INIT
+        self.rot_angle = self.ROT_ANGLE_INIT
+        self.shift_vert = self.SHIFT_PIX_INIT
+        self.shift_horz = self.SHIFT_PIX_INIT
         self.reinitialize = False
 
         # key press parameters
@@ -47,10 +57,10 @@ class Border(Effect):
         self.DEC1 = False
         self.INC2 = False
         self.DEC3 = False
+        self.DOWN = False
+        self.UP = False
         self.LEFT = False
         self.RIGHT = False
-        self.UP = False
-        self.DOWN = False
 
     def _process_io(self, key_list):
 
@@ -78,18 +88,24 @@ class Border(Effect):
         elif key_list[ord('t')]:
             key_list[ord('t')] = False
             self.style = (self.style + 1) % self.MAX_NUM_STYLES
-            self.reinitialize = True
+            # self.reinitialize = True
         elif key_list[ord('w')]:
             key_list[ord('w')] = False
             # self.random_walk = not self.random_walk
             # self.chan_vec_pos = np.zeros((3, 2))
             # self.noise.reinitialize()
-        elif key_list[ord('T')]:
-            key_list[ord('T')] = False
-            self.UP = True
         elif key_list[ord('R')]:
             key_list[ord('R')] = False
             self.DOWN = True
+        elif key_list[ord('T')]:
+            key_list[ord('T')] = False
+            self.UP = True
+        elif key_list[ord('Q')]:
+            key_list[ord('Q')] = False
+            self.LEFT = True
+        elif key_list[ord('S')]:
+            key_list[ord('S')] = False
+            self.RIGHT = True
 
         # process options
         if self.DEC0:
@@ -102,15 +118,15 @@ class Border(Effect):
                                    self.MULT_FACTOR_MIN,
                                    self.MULT_FACTOR_MAX)
 
-        # if self.DEC1:
-        #     self.DEC1 = False
-        #     self.median_kern -= self.MEDIAN_KERN_INC
-        # if self.INC1:
-        #     self.INC1 = False
-        #     self.median_kern += self.MEDIAN_KERN_INC
-        # self.median_kern = np.clip(self.median_kern,
-        #                            self.MEDIAN_KERN_MIN,
-        #                            self.MEDIAN_KERN_MAX)
+        if self.DEC1:
+            self.DEC1 = False
+            self.rot_angle -= self.ROT_ANGLE_INC
+        if self.INC1:
+            self.INC1 = False
+            self.rot_angle += self.ROT_ANGLE_INC
+        self.rot_angle = np.clip(self.rot_angle,
+                                 self.ROT_ANGLE_MIN,
+                                 self.ROT_ANGLE_MAX)
 
         # if self.DEC2:
         #     self.DEC2 = False
@@ -122,15 +138,61 @@ class Border(Effect):
         #                               self.FRAME_EXP_RATE_MIN,
         #                               self.FRAME_EXP_RATE_MAX)
 
+        if self.DOWN:
+            self.DOWN = False
+            self.shift_vert -= self.SHIFT_PIX_INC
+        if self.UP:
+            self.UP = False
+            self.shift_vert += self.SHIFT_PIX_INC
+        self.shift_vert = np.clip(self.shift_vert,
+                                  self.SHIFT_PIX_MIN,
+                                  self.SHIFT_PIX_MAX)
+        if self.LEFT:
+            self.LEFT = False
+            self.shift_horz -= self.SHIFT_PIX_INC
+        if self.RIGHT:
+            self.RIGHT = False
+            self.shift_horz += self.SHIFT_PIX_INC
+        self.shift_horz = np.clip(self.shift_horz,
+                                  self.SHIFT_PIX_MIN,
+                                  self.SHIFT_PIX_MAX)
+
     def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
         if not key_lock:
             self._process_io(key_list)
 
+        if self.reinitialize:
+            self.reinitialize = False
+            self.mult_factor = self.MULT_FACTOR_INIT
+            self.rot_angle = self.ROT_ANGLE_INIT
+            self.shift_vert = self.SHIFT_PIX_INIT
+            self.shift_horz = self.SHIFT_PIX_INIT
+
         # process image
         [im_height, im_width, _] = frame.shape
 
+        # rotate
+        if self.rot_angle is not 0:
+            rot_mat = cv2.getRotationMatrix2D(
+                (im_width / 2, im_height / 2),
+                self.rot_angle,
+                1.0)
+            frame = cv2.warpAffine(
+                frame,
+                rot_mat,
+                (im_width, im_height))
+
+        # translate
+        if self.shift_horz is not 0 or self.shift_vert is not 0:
+            frame = cv2.warpAffine(
+                frame,
+                np.float32([[1, 0, self.shift_horz],
+                            [0, 1, self.shift_vert]]),
+                (im_width, im_height))
+
+        # add borders
         if self.style == 1:
             # resize frame
             frame = cv2.resize(frame, None,
@@ -516,7 +578,7 @@ class RGBWalk(Effect):
             self.noise.reinitialize()
 
         # process image
-        [im_height, im_width, im_channels] = frame.shape
+        [im_height, im_width, _] = frame.shape
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame_gray = cv2.adaptiveThreshold(frame_gray, 255,
                                            cv2.ADAPTIVE_THRESH_MEAN_C,
