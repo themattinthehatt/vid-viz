@@ -25,72 +25,154 @@ class Border(Effect):
     def __init__(self):
 
         # user option constants
-        self.MAX_NUM_BORDER_STYLES = 3
-        self.height_mult = 0.5
-        self.width_mult = 0.5
-        self.mult_inc = 0.05
+        self.MULT_FACTOR_INIT = 1.0
+        self.MULT_FACTOR_MIN = 0.01
+        self.MULT_FACTOR_MAX = 10.0
+        self.MULT_FACTOR_INC = 0.05
+        # self.MEDIAN_KERN_INIT = 7
+        # self.MEDIAN_KERN_MIN = 3
+        # self.MEDIAN_KERN_MAX = 75
+        # self.MEDIAN_KERN_INC = 2
+        self.MAX_NUM_STYLES = 3
 
         # user options
         self.style = 0
+        self.mult_factor = self.MULT_FACTOR_INIT
+        self.reinitialize = False
 
         # key press parameters
         self.INC0 = False
         self.DEC0 = False
         self.INC1 = False
         self.DEC1 = False
+        self.INC2 = False
+        self.DEC3 = False
+        self.LEFT = False
+        self.RIGHT = False
+        self.UP = False
+        self.DOWN = False
 
-    def process(self, frame, key_list):
+    def _process_io(self, key_list):
 
-        # process keyboard input
-        if key_list[ord('n')]:
-            key_list[ord('n')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_BORDER_STYLES
-        elif key_list[ord('-')]:
+        if key_list[ord('-')]:
             key_list[ord('-')] = False
             self.DEC0 = True
         elif key_list[ord('=')]:
             key_list[ord('=')] = False
             self.INC0 = True
+        elif key_list[ord('[')]:
+            key_list[ord('[')] = False
+            self.DEC1 = True
+        elif key_list[ord(']')]:
+            key_list[ord(']')] = False
+            self.INC1 = True
+        elif key_list[ord(';')]:
+            key_list[ord(';')] = False
+            self.DEC2 = True
+        elif key_list[ord('\'')]:
+            key_list[ord('\'')] = False
+            self.INC2 = True
+        elif key_list[ord('/')]:
+            key_list[ord('/')] = False
+            self.reinitialize = True
+        elif key_list[ord('t')]:
+            key_list[ord('t')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_STYLES
+            self.reinitialize = True
+        elif key_list[ord('w')]:
+            key_list[ord('w')] = False
+            # self.random_walk = not self.random_walk
+            # self.chan_vec_pos = np.zeros((3, 2))
+            # self.noise.reinitialize()
         elif key_list[ord('T')]:
             key_list[ord('T')] = False
-            self.DEC1 = True
+            self.UP = True
         elif key_list[ord('R')]:
             key_list[ord('R')] = False
-            self.INC1 = True
+            self.DOWN = True
 
         # process options
         if self.DEC0:
             self.DEC0 = False
-            self.height_mult -= self.mult_inc
-            if self.height_mult < 0:
-                self.height_mult = 0
-            self.width_mult -= self.mult_inc
-            if self.width_mult < 0:
-                self.width_mult = 0
+            self.mult_factor -= self.MULT_FACTOR_INC
         if self.INC0:
             self.INC0 = False
-            self.height_mult += self.mult_inc
-            self.width_mult += self.width_mult
+            self.mult_factor += self.MULT_FACTOR_INC
+        self.mult_factor = np.clip(self.mult_factor,
+                                   self.MULT_FACTOR_MIN,
+                                   self.MULT_FACTOR_MAX)
+
+        # if self.DEC1:
+        #     self.DEC1 = False
+        #     self.median_kern -= self.MEDIAN_KERN_INC
+        # if self.INC1:
+        #     self.INC1 = False
+        #     self.median_kern += self.MEDIAN_KERN_INC
+        # self.median_kern = np.clip(self.median_kern,
+        #                            self.MEDIAN_KERN_MIN,
+        #                            self.MEDIAN_KERN_MAX)
+
+        # if self.DEC2:
+        #     self.DEC2 = False
+        #     self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
+        # if self.INC2:
+        #     self.INC2 = False
+        #     self.frame_exp_rate += self.FRAME_EXP_RATE_INC
+        # self.frame_exp_rate = np.clip(self.frame_exp_rate,
+        #                               self.FRAME_EXP_RATE_MIN,
+        #                               self.FRAME_EXP_RATE_MAX)
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
 
         # process image
-        [im_height, im_width, im_channels] = frame.shape
+        [im_height, im_width, _] = frame.shape
 
         if self.style == 1:
-            # top, bottom, left, right
-            frame = cv2.copyMakeBorder(frame,
-                                       int(im_height * self.height_mult),
-                                       int(im_height * self.height_mult),
-                                       int(im_width * self.width_mult),
-                                       int(im_width * self.width_mult),
-                                       cv2.BORDER_WRAP)
+            # resize frame
+            frame = cv2.resize(frame, None,
+                               fx=self.mult_factor,
+                               fy=self.mult_factor,
+                               interpolation=cv2.INTER_LINEAR)
+            if self.mult_factor < 1.0:
+                # top, bottom, left, right
+                frame = cv2.copyMakeBorder(
+                    frame,
+                    int(im_height * (1.0 - self.mult_factor) / 2),
+                    int(im_height * (1.0 - self.mult_factor) / 2),
+                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    cv2.BORDER_WRAP)
+            elif self.mult_factor > 1.0:
+                [im_height_new, im_width_new, _] = frame.shape
+                frame = cv2.getRectSubPix(
+                    frame,
+                    (im_width, im_height),
+                    (im_width_new / 2, im_height_new / 2))
         elif self.style == 2:
-            # top, bottom, left, right
-            frame = cv2.copyMakeBorder(frame,
-                                       int(im_height * 2 * self.height_mult),
-                                       0,
-                                       int(im_width * 2 * self.width_mult),
-                                       0,
-                                       cv2.BORDER_REFLECT)
+            # resize frame
+            frame = cv2.resize(frame, None,
+                               fx=self.mult_factor,
+                               fy=self.mult_factor,
+                               interpolation=cv2.INTER_LINEAR)
+            if self.mult_factor < 1.0:
+                # top, bottom, left, right
+                frame = cv2.copyMakeBorder(
+                    frame,
+                    int(im_height * (1.0 - self.mult_factor) / 2),
+                    int(im_height * (1.0 - self.mult_factor) / 2),
+                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    cv2.BORDER_REFLECT)
+            elif self.mult_factor > 1.0:
+                [im_height_new, im_width_new, _] = frame.shape
+                frame = cv2.getRectSubPix(
+                    frame,
+                    (im_width, im_height),
+                    (im_width_new / 2, im_height_new / 2))
 
         return frame
 
@@ -128,27 +210,28 @@ class Threshold(Effect):
         self.THRESH_BLOCK = 21
         self.THRESH_C = 4
 
-    def process(self, frame, key_list):
+    def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
-        if key_list[ord('b')]:
-            key_list[ord('b')] = False
-            self.use_chan[0] = True
-            self.use_chan[1] = False
-            self.use_chan[2] = False
-        elif key_list[ord('g')]:
-            key_list[ord('g')] = False
-            self.use_chan[0] = False
-            self.use_chan[1] = True
-            self.use_chan[2] = False
-        elif key_list[ord('r')]:
-            key_list[ord('r')] = False
-            self.use_chan[0] = False
-            self.use_chan[1] = False
-            self.use_chan[2] = True
-        elif key_list[ord('t')]:
-            key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_THRESH_STYLES
+        if not key_lock:
+            if key_list[ord('b')]:
+                key_list[ord('b')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = False
+                self.use_chan[2] = False
+            elif key_list[ord('g')]:
+                key_list[ord('g')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = True
+                self.use_chan[2] = False
+            elif key_list[ord('r')]:
+                key_list[ord('r')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = False
+                self.use_chan[2] = True
+            elif key_list[ord('t')]:
+                key_list[ord('t')] = False
+                self.style = (self.style + 1) % self.MAX_NUM_THRESH_STYLES
 
         # process options
         if self.style == 0:
@@ -227,41 +310,42 @@ class Alien(Effect):
         self.INC1 = False
         self.DEC1 = False
 
-    def process(self, frame, key_list):
+    def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
-        if key_list[ord('b')]:
-            key_list[ord('b')] = False
-            self.use_chan[0] = True
-            self.use_chan[1] = False
-            self.use_chan[2] = False
-        elif key_list[ord('g')]:
-            key_list[ord('g')] = False
-            self.use_chan[0] = False
-            self.use_chan[1] = True
-            self.use_chan[2] = False
-        elif key_list[ord('r')]:
-            key_list[ord('r')] = False
-            self.use_chan[0] = False
-            self.use_chan[1] = False
-            self.use_chan[2] = True
-        elif key_list[ord('/')]:
-            key_list[ord('/')] = False
-            # reset parameters
-            self.chan_freq = [0.2, 0.2, 0.2]
-            self.chan_phase = [0, 0, 0]
-        elif key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('T')]:
-            key_list[ord('T')] = False
-            self.DEC1 = True
-        elif key_list[ord('R')]:
-            key_list[ord('R')] = False
-            self.INC1 = True
+        if not key_lock:
+            if key_list[ord('b')]:
+                key_list[ord('b')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = False
+                self.use_chan[2] = False
+            elif key_list[ord('g')]:
+                key_list[ord('g')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = True
+                self.use_chan[2] = False
+            elif key_list[ord('r')]:
+                key_list[ord('r')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = False
+                self.use_chan[2] = True
+            elif key_list[ord('/')]:
+                key_list[ord('/')] = False
+                # reset parameters
+                self.chan_freq = [0.2, 0.2, 0.2]
+                self.chan_phase = [0, 0, 0]
+            elif key_list[ord('-')]:
+                key_list[ord('-')] = False
+                self.DEC0 = True
+            elif key_list[ord('=')]:
+                key_list[ord('=')] = False
+                self.INC0 = True
+            elif key_list[ord('T')]:
+                key_list[ord('T')] = False
+                self.DEC1 = True
+            elif key_list[ord('R')]:
+                key_list[ord('R')] = False
+                self.INC1 = True
 
         # process options
         for chan in range(3):
@@ -399,22 +483,23 @@ class RGBWalk(Effect):
         self.INC1 = False
         self.DEC1 = False
 
-    def process(self, frame, key_list):
+    def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
-        if key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('/')]:
-            key_list[ord('/')] = False
-            self.reinitialize = True
-        elif key_list[ord('t')]:
-            key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_STYLES
-            self.reinitialize = True
+        if not key_lock:
+            if key_list[ord('-')]:
+                key_list[ord('-')] = False
+                self.DEC0 = True
+            elif key_list[ord('=')]:
+                key_list[ord('=')] = False
+                self.INC0 = True
+            elif key_list[ord('/')]:
+                key_list[ord('/')] = False
+                self.reinitialize = True
+            elif key_list[ord('t')]:
+                key_list[ord('t')] = False
+                self.style = (self.style + 1) % self.MAX_NUM_STYLES
+                self.reinitialize = True
 
         # process options
         if self.DEC0:
@@ -587,7 +672,7 @@ class RGBBurst(Effect):
                                       self.FRAME_EXP_RATE_MIN,
                                       self.FRAME_EXP_RATE_MAX)
 
-    def process(self, frame, key_list):
+    def process(self, frame, key_list, key_lock=False):
 
         # update frame info
         if self.frame_cnt == 0:
@@ -595,7 +680,8 @@ class RGBBurst(Effect):
         self.frame_cnt += 1
 
         # process keyboard input
-        self._process_io(key_list)
+        if not key_lock:
+            self._process_io(key_list)
 
         if self.reinitialize:
             self.reinitialize = False
