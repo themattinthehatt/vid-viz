@@ -19,8 +19,9 @@ class Border(Effect):
 
     KEYBOARD INPUTS:
         t - toggle between border styles
-        -/+ - decrease/increase image size
-        [/] - rotate image left/right
+        -/+ - decrease/increase border padding
+        [/] - decrease/increase zoom
+        ;/' - rotate image left/right
         lrud arrows - translate image
         q - quit border effect
     """
@@ -30,8 +31,12 @@ class Border(Effect):
         # user option constants
         self.MULT_FACTOR_INIT = 1.0
         self.MULT_FACTOR_MIN = 0.01
-        self.MULT_FACTOR_MAX = 10.0
+        self.MULT_FACTOR_MAX = 1.0
         self.MULT_FACTOR_INC = 0.05
+        self.ZOOM_FACTOR_INIT = 1.0
+        self.ZOOM_FACTOR_MIN = 1.0
+        self.ZOOM_FACTOR_MAX = 5.0
+        self.ZOOM_FACTOR_INC = 0.05
         self.ROT_ANGLE_INIT = 0
         self.ROT_ANGLE_MIN = -360
         self.ROT_ANGLE_MAX = 360
@@ -45,6 +50,7 @@ class Border(Effect):
         # user options
         self.style = 0
         self.mult_factor = self.MULT_FACTOR_INIT
+        self.zoom_factor = self.ZOOM_FACTOR_INIT
         self.rot_angle = self.ROT_ANGLE_INIT
         self.shift_vert = self.SHIFT_PIX_INIT
         self.shift_horz = self.SHIFT_PIX_INIT
@@ -56,7 +62,7 @@ class Border(Effect):
         self.INC1 = False
         self.DEC1 = False
         self.INC2 = False
-        self.DEC3 = False
+        self.DEC2 = False
         self.DOWN = False
         self.UP = False
         self.LEFT = False
@@ -120,23 +126,23 @@ class Border(Effect):
 
         if self.DEC1:
             self.DEC1 = False
-            self.rot_angle -= self.ROT_ANGLE_INC
+            self.zoom_factor -= self.ZOOM_FACTOR_INC
         if self.INC1:
             self.INC1 = False
+            self.zoom_factor += self.ZOOM_FACTOR_INC
+        self.zoom_factor = np.clip(self.zoom_factor,
+                                   self.ZOOM_FACTOR_MIN,
+                                   self.ZOOM_FACTOR_MAX)
+
+        if self.DEC2:
+            self.DEC2 = False
+            self.rot_angle -= self.ROT_ANGLE_INC
+        if self.INC2:
+            self.INC2 = False
             self.rot_angle += self.ROT_ANGLE_INC
         self.rot_angle = np.clip(self.rot_angle,
                                  self.ROT_ANGLE_MIN,
                                  self.ROT_ANGLE_MAX)
-
-        # if self.DEC2:
-        #     self.DEC2 = False
-        #     self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
-        # if self.INC2:
-        #     self.INC2 = False
-        #     self.frame_exp_rate += self.FRAME_EXP_RATE_INC
-        # self.frame_exp_rate = np.clip(self.frame_exp_rate,
-        #                               self.FRAME_EXP_RATE_MIN,
-        #                               self.FRAME_EXP_RATE_MAX)
 
         if self.DOWN:
             self.DOWN = False
@@ -166,6 +172,7 @@ class Border(Effect):
         if self.reinitialize:
             self.reinitialize = False
             self.mult_factor = self.MULT_FACTOR_INIT
+            self.zoom_factor = self.ZOOM_FACTOR_INIT
             self.rot_angle = self.ROT_ANGLE_INIT
             self.shift_vert = self.SHIFT_PIX_INIT
             self.shift_horz = self.SHIFT_PIX_INIT
@@ -192,6 +199,15 @@ class Border(Effect):
                             [0, 1, self.shift_vert]]),
                 (im_width, im_height))
 
+        # zoom
+        if self.zoom_factor > 1.0:
+            frame = cv2.getRectSubPix(
+                frame,
+                (int(im_width / self.zoom_factor),
+                 int(im_height / self.zoom_factor)),
+                (im_width / 2, im_height / 2))
+            frame = cv2.resize(frame, (im_width, im_height))
+
         # add borders
         if self.style == 1:
             # resize frame
@@ -208,12 +224,6 @@ class Border(Effect):
                     int(im_width * (1.0 - self.mult_factor) / 2),
                     int(im_width * (1.0 - self.mult_factor) / 2),
                     cv2.BORDER_WRAP)
-            elif self.mult_factor > 1.0:
-                [im_height_new, im_width_new, _] = frame.shape
-                frame = cv2.getRectSubPix(
-                    frame,
-                    (im_width, im_height),
-                    (im_width_new / 2, im_height_new / 2))
         elif self.style == 2:
             # resize frame
             frame = cv2.resize(frame, None,
@@ -229,12 +239,6 @@ class Border(Effect):
                     int(im_width * (1.0 - self.mult_factor) / 2),
                     int(im_width * (1.0 - self.mult_factor) / 2),
                     cv2.BORDER_REFLECT)
-            elif self.mult_factor > 1.0:
-                [im_height_new, im_width_new, _] = frame.shape
-                frame = cv2.getRectSubPix(
-                    frame,
-                    (im_width, im_height),
-                    (im_width_new / 2, im_height_new / 2))
 
         return frame
 
@@ -923,12 +927,13 @@ class Mask(Effect):
         #                               self.FRAME_EXP_RATE_MIN,
         #                               self.FRAME_EXP_RATE_MAX)
 
-    def process(self, frame_orig, key_list):
+    def process(self, frame_orig, key_list, key_lock=False):
 
         frame = np.copy(frame_orig)
 
         # process keyboard input
-        self._process_io(key_list)
+        if not key_lock:
+            self._process_io(key_list)
 
         if self.reinitialize:
             self.reinitialize = False
