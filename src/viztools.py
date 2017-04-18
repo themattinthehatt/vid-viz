@@ -9,6 +9,70 @@ import utils as util
 class Effect(object):
     """Base class for vid-viz effects"""
 
+    def _process_io(self, key_list):
+
+        if key_list[ord('-')]:
+            key_list[ord('-')] = False
+            self.PROPS[0]['DEC'] = True
+        elif key_list[ord('=')]:
+            key_list[ord('=')] = False
+            self.PROPS[0]['INC'] = True
+        elif key_list[ord('[')]:
+            key_list[ord('[')] = False
+            self.PROPS[1]['DEC'] = True
+        elif key_list[ord(']')]:
+            key_list[ord(']')] = False
+            self.PROPS[1]['INC'] = True
+        elif key_list[ord(';')]:
+            key_list[ord(';')] = False
+            self.PROPS[2]['DEC'] = True
+        elif key_list[ord('\'')]:
+            key_list[ord('\'')] = False
+            self.PROPS[2]['INC'] = True
+        elif key_list[ord(',')]:
+            key_list[ord(',')] = False
+            self.PROPS[3]['DEC'] = True
+        elif key_list[ord('.')]:
+            key_list[ord('.')] = False
+            self.PROPS[3]['INC'] = True
+        elif key_list[ord('R')]:
+            key_list[ord('R')] = False
+            self.PROPS[4]['DEC'] = True
+        elif key_list[ord('T')]:
+            key_list[ord('T')] = False
+            self.PROPS[4]['INC'] = True
+        elif key_list[ord('Q')]:
+            key_list[ord('Q')] = False
+            self.PROPS[5]['DEC'] = True
+        elif key_list[ord('S')]:
+            key_list[ord('S')] = False
+            self.PROPS[5]['INC'] = True
+        elif key_list[ord('/')]:
+            key_list[ord('/')] = False
+            self.reinitialize = True
+        elif key_list[ord('t')]:
+            key_list[ord('t')] = False
+            self.style = (self.style + 1) % self.MAX_NUM_STYLES
+            # self.reinitialize = True
+        elif key_list[ord('w')]:
+            key_list[ord('w')] = False
+            self.random_walk = not self.random_walk
+            self.chan_vec_pos = np.zeros(self.chan_vec_pos.shape)
+            self.noise.reinitialize()
+
+        # process options
+        for index, _ in enumerate(self.PROPS):
+            if self.PROPS[index]['DEC']:
+                self.PROPS[index]['DEC'] = False
+                self.PROPS[index]['VAL'] -= self.PROPS[index]['STEP']
+            if self.PROPS[index]['INC']:
+                self.PROPS[index]['INC'] = False
+                self.PROPS[index]['VAL'] += self.PROPS[index]['STEP']
+            self.PROPS[index]['VAL'] = np.clip(
+                self.PROPS[index]['VAL'],
+                self.PROPS[index]['MIN'],
+                self.PROPS[index]['MAX'])
+
     def process(self, frame, key_list):
         raise NotImplementedError
 
@@ -22,6 +86,7 @@ class Border(Effect):
         -/+ - decrease/increase border padding
         [/] - decrease/increase zoom
         ;/' - rotate image left/right
+        ,/. - None
         lrud arrows - translate image
         q - quit border effect
     """
@@ -29,139 +94,77 @@ class Border(Effect):
     def __init__(self):
 
         # user option constants
-        self.MULT_FACTOR_INIT = 1.0
-        self.MULT_FACTOR_MIN = 0.01
-        self.MULT_FACTOR_MAX = 1.0
-        self.MULT_FACTOR_INC = 0.05
-        self.ZOOM_FACTOR_INIT = 1.0
-        self.ZOOM_FACTOR_MIN = 1.0
-        self.ZOOM_FACTOR_MAX = 5.0
-        self.ZOOM_FACTOR_INC = 0.05
-        self.ROT_ANGLE_INIT = 0
-        self.ROT_ANGLE_MIN = -360
-        self.ROT_ANGLE_MAX = 360
-        self.ROT_ANGLE_INC = 5
-        self.SHIFT_PIX_INIT = 0
-        self.SHIFT_PIX_MIN = -500
-        self.SHIFT_PIX_MAX = 500
-        self.SHIFT_PIX_INC = 10
+        MULT_FACTOR = {
+            'NAME': 'mult_factor',
+            'VAL': 1.0,
+            'INIT': 1.0,
+            'MIN': 0.01,
+            'MAX': 1.0,
+            'STEP': 0.05,
+            'INC': False,
+            'DEC': False}
+        ZOOM_FACTOR = {
+            'NAME': 'zoom_factor',
+            'VAL': 1.0,
+            'INIT': 1.0,
+            'MIN': 1.0,
+            'MAX': 10.0,
+            'STEP': 0.05,
+            'INC': False,
+            'DEC': False}
+        ROT_ANGLE = {
+            'NAME': 'rot_angle',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -360,
+            'MAX': 360,
+            'STEP': 5,
+            'INC': False,
+            'DEC': False}
+        SHIFT_PIX_VERT = {
+            'NAME': 'shift_vert',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -500,
+            'MAX': 500,
+            'STEP': 10,
+            'INC': False,
+            'DEC': False}
+        SHIFT_PIX_HORZ = {
+            'NAME': 'shift_horz',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -500,
+            'MAX': 500,
+            'STEP': 10,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
         self.MAX_NUM_STYLES = 3
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [MULT_FACTOR,
+                      ZOOM_FACTOR,
+                      ROT_ANGLE,
+                      NONE,
+                      SHIFT_PIX_HORZ,
+                      SHIFT_PIX_VERT]
 
         # user options
         self.style = 0
-        self.mult_factor = self.MULT_FACTOR_INIT
-        self.zoom_factor = self.ZOOM_FACTOR_INIT
-        self.rot_angle = self.ROT_ANGLE_INIT
-        self.shift_vert = self.SHIFT_PIX_INIT
-        self.shift_horz = self.SHIFT_PIX_INIT
         self.reinitialize = False
-
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
-        self.INC2 = False
-        self.DEC2 = False
-        self.DOWN = False
-        self.UP = False
-        self.LEFT = False
-        self.RIGHT = False
-
-    def _process_io(self, key_list):
-
-        if key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('[')]:
-            key_list[ord('[')] = False
-            self.DEC1 = True
-        elif key_list[ord(']')]:
-            key_list[ord(']')] = False
-            self.INC1 = True
-        elif key_list[ord(';')]:
-            key_list[ord(';')] = False
-            self.DEC2 = True
-        elif key_list[ord('\'')]:
-            key_list[ord('\'')] = False
-            self.INC2 = True
-        elif key_list[ord('/')]:
-            key_list[ord('/')] = False
-            self.reinitialize = True
-        elif key_list[ord('t')]:
-            key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_STYLES
-            # self.reinitialize = True
-        elif key_list[ord('w')]:
-            key_list[ord('w')] = False
-            # self.random_walk = not self.random_walk
-            # self.chan_vec_pos = np.zeros((3, 2))
-            # self.noise.reinitialize()
-        elif key_list[ord('R')]:
-            key_list[ord('R')] = False
-            self.DOWN = True
-        elif key_list[ord('T')]:
-            key_list[ord('T')] = False
-            self.UP = True
-        elif key_list[ord('Q')]:
-            key_list[ord('Q')] = False
-            self.LEFT = True
-        elif key_list[ord('S')]:
-            key_list[ord('S')] = False
-            self.RIGHT = True
-
-        # process options
-        if self.DEC0:
-            self.DEC0 = False
-            self.mult_factor -= self.MULT_FACTOR_INC
-        if self.INC0:
-            self.INC0 = False
-            self.mult_factor += self.MULT_FACTOR_INC
-        self.mult_factor = np.clip(self.mult_factor,
-                                   self.MULT_FACTOR_MIN,
-                                   self.MULT_FACTOR_MAX)
-
-        if self.DEC1:
-            self.DEC1 = False
-            self.zoom_factor -= self.ZOOM_FACTOR_INC
-        if self.INC1:
-            self.INC1 = False
-            self.zoom_factor += self.ZOOM_FACTOR_INC
-        self.zoom_factor = np.clip(self.zoom_factor,
-                                   self.ZOOM_FACTOR_MIN,
-                                   self.ZOOM_FACTOR_MAX)
-
-        if self.DEC2:
-            self.DEC2 = False
-            self.rot_angle -= self.ROT_ANGLE_INC
-        if self.INC2:
-            self.INC2 = False
-            self.rot_angle += self.ROT_ANGLE_INC
-        self.rot_angle = np.clip(self.rot_angle,
-                                 self.ROT_ANGLE_MIN,
-                                 self.ROT_ANGLE_MAX)
-
-        if self.DOWN:
-            self.DOWN = False
-            self.shift_vert -= self.SHIFT_PIX_INC
-        if self.UP:
-            self.UP = False
-            self.shift_vert += self.SHIFT_PIX_INC
-        self.shift_vert = np.clip(self.shift_vert,
-                                  self.SHIFT_PIX_MIN,
-                                  self.SHIFT_PIX_MAX)
-        if self.LEFT:
-            self.LEFT = False
-            self.shift_horz -= self.SHIFT_PIX_INC
-        if self.RIGHT:
-            self.RIGHT = False
-            self.shift_horz += self.SHIFT_PIX_INC
-        self.shift_horz = np.clip(self.shift_horz,
-                                  self.SHIFT_PIX_MIN,
-                                  self.SHIFT_PIX_MAX)
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -171,20 +174,24 @@ class Border(Effect):
 
         if self.reinitialize:
             self.reinitialize = False
-            self.mult_factor = self.MULT_FACTOR_INIT
-            self.zoom_factor = self.ZOOM_FACTOR_INIT
-            self.rot_angle = self.ROT_ANGLE_INIT
-            self.shift_vert = self.SHIFT_PIX_INIT
-            self.shift_horz = self.SHIFT_PIX_INIT
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        mult_factor = self.PROPS[0]['VAL']
+        zoom_factor = self.PROPS[1]['VAL']
+        rot_angle = self.PROPS[2]['VAL']
+        shift_vert = self.PROPS[4]['VAL']
+        shift_horz = self.PROPS[5]['VAL']
 
         # process image
         [im_height, im_width, _] = frame.shape
 
         # rotate
-        if self.rot_angle is not 0:
+        if rot_angle is not 0:
             rot_mat = cv2.getRotationMatrix2D(
                 (im_width / 2, im_height / 2),
-                self.rot_angle,
+                rot_angle,
                 1.0)
             frame = cv2.warpAffine(
                 frame,
@@ -192,19 +199,19 @@ class Border(Effect):
                 (im_width, im_height))
 
         # translate
-        if self.shift_horz is not 0 or self.shift_vert is not 0:
+        if shift_horz is not 0 or shift_vert is not 0:
             frame = cv2.warpAffine(
                 frame,
-                np.float32([[1, 0, self.shift_horz],
-                            [0, 1, self.shift_vert]]),
+                np.float32([[1, 0, shift_horz],
+                            [0, 1, shift_vert]]),
                 (im_width, im_height))
 
         # zoom
-        if self.zoom_factor > 1.0:
+        if zoom_factor > 1.0:
             frame = cv2.getRectSubPix(
                 frame,
-                (int(im_width / self.zoom_factor),
-                 int(im_height / self.zoom_factor)),
+                (int(im_width / zoom_factor),
+                 int(im_height / zoom_factor)),
                 (im_width / 2, im_height / 2))
             frame = cv2.resize(frame, (im_width, im_height))
 
@@ -212,32 +219,32 @@ class Border(Effect):
         if self.style == 1:
             # resize frame
             frame = cv2.resize(frame, None,
-                               fx=self.mult_factor,
-                               fy=self.mult_factor,
+                               fx=mult_factor,
+                               fy=mult_factor,
                                interpolation=cv2.INTER_LINEAR)
-            if self.mult_factor < 1.0:
+            if mult_factor < 1.0:
                 # top, bottom, left, right
                 frame = cv2.copyMakeBorder(
                     frame,
-                    int(im_height * (1.0 - self.mult_factor) / 2),
-                    int(im_height * (1.0 - self.mult_factor) / 2),
-                    int(im_width * (1.0 - self.mult_factor) / 2),
-                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    int(im_height * (1.0 - mult_factor) / 2),
+                    int(im_height * (1.0 - mult_factor) / 2),
+                    int(im_width * (1.0 - mult_factor) / 2),
+                    int(im_width * (1.0 - mult_factor) / 2),
                     cv2.BORDER_WRAP)
         elif self.style == 2:
             # resize frame
             frame = cv2.resize(frame, None,
-                               fx=self.mult_factor,
-                               fy=self.mult_factor,
+                               fx=mult_factor,
+                               fy=mult_factor,
                                interpolation=cv2.INTER_LINEAR)
-            if self.mult_factor < 1.0:
+            if mult_factor < 1.0:
                 # top, bottom, left, right
                 frame = cv2.copyMakeBorder(
                     frame,
-                    int(im_height * (1.0 - self.mult_factor) / 2),
-                    int(im_height * (1.0 - self.mult_factor) / 2),
-                    int(im_width * (1.0 - self.mult_factor) / 2),
-                    int(im_width * (1.0 - self.mult_factor) / 2),
+                    int(im_height * (1.0 - mult_factor) / 2),
+                    int(im_height * (1.0 - mult_factor) / 2),
+                    int(im_width * (1.0 - mult_factor) / 2),
+                    int(im_width * (1.0 - mult_factor) / 2),
                     cv2.BORDER_REFLECT)
 
         return frame
