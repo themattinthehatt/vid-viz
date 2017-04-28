@@ -5,6 +5,12 @@ import numpy as np
 
 import utils as util
 
+"""TODO
+- classes that need refactoring with list/list
+    threshold
+    alien
+"""
+
 
 class Effect(object):
     """Base class for vid-viz effects"""
@@ -151,17 +157,18 @@ class Border(Effect):
         self.MAX_NUM_STYLES = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [MULT_FACTOR,
-                      ZOOM_FACTOR,
-                      ROT_ANGLE,
-                      NONE,
-                      SHIFT_PIX_HORZ,
-                      SHIFT_PIX_VERT]
+        self.PROPS = [
+            MULT_FACTOR,
+            ZOOM_FACTOR,
+            ROT_ANGLE,
+            NONE,
+            SHIFT_PIX_HORZ,
+            SHIFT_PIX_VERT]
 
         # user options
         self.style = 0
         self.reinitialize = False
-        self.random_walk = True
+        self.random_walk = False
         self.chan_vec_pos = np.zeros((1, 1))
         self.noise = util.SmoothNoise(num_samples=10,
                                       num_channels=self.chan_vec_pos.size)
@@ -218,10 +225,11 @@ class Border(Effect):
         # add borders
         if self.style == 1:
             # resize frame
-            frame = cv2.resize(frame, None,
-                               fx=mult_factor,
-                               fy=mult_factor,
-                               interpolation=cv2.INTER_LINEAR)
+            frame = cv2.resize(
+                frame, None,
+                fx=mult_factor,
+                fy=mult_factor,
+                interpolation=cv2.INTER_LINEAR)
             if mult_factor < 1.0:
                 # top, bottom, left, right
                 frame = cv2.copyMakeBorder(
@@ -233,10 +241,11 @@ class Border(Effect):
                     cv2.BORDER_WRAP)
         elif self.style == 2:
             # resize frame
-            frame = cv2.resize(frame, None,
-                               fx=mult_factor,
-                               fy=mult_factor,
-                               interpolation=cv2.INTER_LINEAR)
+            frame = cv2.resize(
+                frame, None,
+                fx=mult_factor,
+                fy=mult_factor,
+                interpolation=cv2.INTER_LINEAR)
             if mult_factor < 1.0:
                 # top, bottom, left, right
                 frame = cv2.copyMakeBorder(
@@ -322,12 +331,13 @@ class Threshold(Effect):
         # process image
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame_gray = cv2.medianBlur(frame_gray, 11)
-        frame_thresh = cv2.adaptiveThreshold(frame_gray,
-                                             self.THRESH_CEIL,
-                                             self.ADAPTIVE_THRESH_TYPE,
-                                             self.THRESH_TYPE,
-                                             self.THRESH_BLOCK,
-                                             self.THRESH_C)
+        frame_thresh = cv2.adaptiveThreshold(
+            frame_gray,
+            self.THRESH_CEIL,
+            self.ADAPTIVE_THRESH_TYPE,
+            self.THRESH_TYPE,
+            self.THRESH_BLOCK,
+            self.THRESH_C)
         for chan in range(3):
             if self.chan_style[chan] == 1:
                 frame[:, :, chan] = 0
@@ -529,76 +539,84 @@ class RGBWalk(Effect):
     channels
 
     KEYBOARD INPUTS:
-        / - reset random walk
         t - toggle between effect types 
-        -/+ - decrease/increase random walk step size
+        w - reset random walk
+        -/+ - None
+        [/] - None
+        ;/' - None
+        ,/. - decrease/increase random walk step size
+        / - reset random walk
         q - quit rgbwalk effect
     """
 
     def __init__(self):
 
         # user option constants
-        self.STEP_SIZE_MIN = 0.5
-        self.STEP_SIZE_MAX = 15.0
-        self.STEP_SIZE_INC = 1.0
+        STEP_SIZE = {
+            'DESC': 'step size that scales random walk',
+            'NAME': 'step_size',
+            'VAL': 5.0,
+            'INIT': 5.0,
+            'MIN': 0.5,
+            'MAX': 15.0,
+            'STEP': 1.0,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'DESC': '',
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
         self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            NONE,
+            NONE,
+            NONE,
+            STEP_SIZE,
+            NONE,
+            NONE]
 
         # user options
         self.style = 0
-        self.step_size = 5.0                # step size of random walk (pixels)
         self.reinitialize = False           # reset random walk
+        self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10, num_channels=6)
-
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
 
     def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
         if not key_lock:
-            if key_list[ord('-')]:
-                key_list[ord('-')] = False
-                self.DEC0 = True
-            elif key_list[ord('=')]:
-                key_list[ord('=')] = False
-                self.INC0 = True
-            elif key_list[ord('/')]:
-                key_list[ord('/')] = False
-                self.reinitialize = True
-            elif key_list[ord('t')]:
-                key_list[ord('t')] = False
-                self.style = (self.style + 1) % self.MAX_NUM_STYLES
-                self.reinitialize = True
+            self._process_io(key_list)
 
-        # process options
-        if self.DEC0:
-            self.DEC0 = False
-            self.step_size -= self.STEP_SIZE_INC
-        if self.INC0:
-            self.INC0 = False
-            self.step_size += self.STEP_SIZE_INC
-        self.step_size = np.clip(self.step_size,
-                                 self.STEP_SIZE_MIN, self.STEP_SIZE_MAX)
         if self.reinitialize:
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
 
+        # human-readable names
+        step_size = self.PROPS[3]['VAL']
+
         # process image
         [im_height, im_width, _] = frame.shape
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frame_gray = cv2.adaptiveThreshold(frame_gray, 255,
-                                           cv2.ADAPTIVE_THRESH_MEAN_C,
-                                           cv2.THRESH_BINARY_INV, 15, 5)
+        frame_gray = cv2.adaptiveThreshold(
+            frame_gray, 255,
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY_INV, 15, 5)
         frame_gray = cv2.medianBlur(frame_gray, 7)
 
         # update noise values
         self.chan_vec_pos += np.reshape(
-            self.step_size * self.noise.get_next_vals(), (3, 2))
+            step_size * self.noise.get_next_vals(), (3, 2))
 
         # translate channels
         if self.style == 0:
@@ -616,7 +634,7 @@ class RGBWalk(Effect):
             y_dir = self.chan_vec_pos[1, 1]
             norm_dirs = [x_dir, y_dir] / np.linalg.norm([x_dir, y_dir])
             for chan in range(3):
-                step_len = 0.1 * self.step_size * self.chan_vec_pos[chan, 0]
+                step_len = 0.1 * step_size * self.chan_vec_pos[chan, 0]
                 frame[:, :, chan] = cv2.warpAffine(
                     frame_gray,
                     np.float32([[1, 0, x_dir + step_len * norm_dirs[0]],
@@ -637,7 +655,7 @@ class RGBBurst(Effect):
         -/+ - decrease/increase interval at which burst takes place
         [/] - decrease/increase frame decay rate (apparent speed)
         ;/' - decrease/increase frame expansion rate (tail length)
-        ,/. - None
+        ,/. - decrease/increase random walk step size
         / - reset parameters
         q - quit rgbburst effect
     """
@@ -646,6 +664,7 @@ class RGBBurst(Effect):
 
         # user option constants
         FRAME_INT = {
+            'DESC': 'interval at which burst takes place',
             'NAME': 'frame_interval',
             'VAL': 10,
             'INIT': 10,
@@ -655,6 +674,7 @@ class RGBBurst(Effect):
             'INC': False,
             'DEC': False}
         FRAME_DECAY = {
+            'DESC': 'decay rate for background frame luminance',
             'NAME': 'frame_decay',
             'VAL': 0.8,
             'INIT': 0.8,
@@ -664,12 +684,23 @@ class RGBBurst(Effect):
             'INC': False,
             'DEC': False}
         EXP_RATE = {
+            'DESC': 'expansion rate of background frame',
             'NAME': 'frame_expansion_rate',
             'VAL': 1.1,
             'INIT': 1.1,
             'MIN': 1.01,
             'MAX': 2.0,
             'STEP': 0.01,
+            'INC': False,
+            'DEC': False}
+        STEP_SIZE = {
+            'DESC': 'step size that scales random walk',
+            'NAME': 'step_size',
+            'VAL': 5.0,
+            'INIT': 5.0,
+            'MIN': 0.5,
+            'MAX': 15.0,
+            'STEP': 1.0,
             'INC': False,
             'DEC': False}
         NONE = {
@@ -684,18 +715,18 @@ class RGBBurst(Effect):
         self.MAX_NUM_STYLES = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [FRAME_INT,
-                      FRAME_DECAY,
-                      EXP_RATE,
-                      NONE,
-                      NONE,
-                      NONE]
+        self.PROPS = [
+            FRAME_INT,
+            FRAME_DECAY,
+            EXP_RATE,
+            STEP_SIZE,
+            NONE,
+            NONE]
 
         # user options
         self.style = 0
         self.reinitialize = False
         self.random_walk = True
-        self.step_size = 3.0  # multiplier on random walk step size
         self.chan_vec_pos = np.zeros((3, 2))
         self.noise = util.SmoothNoise(num_samples=10,
                                       num_channels=self.chan_vec_pos.size)
@@ -703,70 +734,6 @@ class RGBBurst(Effect):
         # background frame parameters
         self.frame_cnt = 0                              # frame counter
         self.frame = None                               # background frame
-
-    # def _process_io(self, key_list):
-    #
-    #     if key_list[ord('-')]:
-    #         key_list[ord('-')] = False
-    #         self.DEC0 = True
-    #     elif key_list[ord('=')]:
-    #         key_list[ord('=')] = False
-    #         self.INC0 = True
-    #     elif key_list[ord('[')]:
-    #         key_list[ord('[')] = False
-    #         self.DEC1 = True
-    #     elif key_list[ord(']')]:
-    #         key_list[ord(']')] = False
-    #         self.INC1 = True
-    #     elif key_list[ord(';')]:
-    #         key_list[ord(';')] = False
-    #         self.DEC2 = True
-    #     elif key_list[ord('\'')]:
-    #         key_list[ord('\'')] = False
-    #         self.INC2 = True
-    #     elif key_list[ord('/')]:
-    #         key_list[ord('/')] = False
-    #         self.reinitialize = True
-    #     elif key_list[ord('t')]:
-    #         key_list[ord('t')] = False
-    #         self.style = (self.style + 1) % self.MAX_NUM_STYLES
-    #         self.reinitialize = True
-    #     elif key_list[ord('w')]:
-    #         key_list[ord('w')] = False
-    #         self.random_walk = not self.random_walk
-    #         self.chan_vec_pos = np.zeros((3, 2))
-    #         self.noise.reinitialize()
-    #
-    #     # process options
-    #     if self.DEC0:
-    #         self.DEC0 = False
-    #         self.frame_int -= self.FRAME_INT_INC
-    #     if self.INC0:
-    #         self.INC0 = False
-    #         self.frame_int += self.FRAME_INT_INC
-    #     self.frame_int = np.clip(self.frame_int,
-    #                              self.FRAME_INT_MIN,
-    #                              self.FRAME_INT_MAX)
-    #
-    #     if self.DEC1:
-    #         self.DEC1 = False
-    #         self.frame_decay -= self.FRAME_DECAY_INC
-    #     if self.INC1:
-    #         self.INC1 = False
-    #         self.frame_decay += self.FRAME_DECAY_INC
-    #     self.frame_decay = np.clip(self.frame_decay,
-    #                                self.FRAME_DECAY_MIN,
-    #                                self.FRAME_DECAY_MAX)
-    #
-    #     if self.DEC2:
-    #         self.DEC2 = False
-    #         self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
-    #     if self.INC2:
-    #         self.INC2 = False
-    #         self.frame_exp_rate += self.FRAME_EXP_RATE_INC
-    #     self.frame_exp_rate = np.clip(self.frame_exp_rate,
-    #                                   self.FRAME_EXP_RATE_MIN,
-    #                                   self.FRAME_EXP_RATE_MAX)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -790,6 +757,7 @@ class RGBBurst(Effect):
         frame_interval = self.PROPS[0]['VAL']
         frame_decay = self.PROPS[1]['VAL']
         frame_expansion_rate = self.PROPS[2]['VAL']
+        step_size = self.PROPS[3]['VAL']
 
         # process image
         [im_height, im_width, _] = frame.shape
@@ -803,23 +771,25 @@ class RGBBurst(Effect):
                 (im_width, im_height))
             # update noise values
             self.chan_vec_pos += np.reshape(
-                self.step_size * self.noise.get_next_vals(), (3, 2))
+                step_size * self.noise.get_next_vals(), (3, 2))
 
         if self.style == 0:
 
             # update background frame
-            frame_exp = cv2.resize(self.frame,
-                                   None,
-                                   fx=frame_expansion_rate,
-                                   fy=frame_expansion_rate,
-                                   interpolation=cv2.INTER_LINEAR)
+            frame_exp = cv2.resize(
+                self.frame,
+                None,
+                fx=frame_expansion_rate,
+                fy=frame_expansion_rate,
+                interpolation=cv2.INTER_LINEAR)
             [im_exp_height, im_exp_width, _] = frame_exp.shape
             self.frame = cv2.getRectSubPix(
                 frame_exp,
                 (im_width, im_height),
                 (im_exp_width / 2, im_exp_height / 2))
-            self.frame = cv2.addWeighted(0, 1.0-frame_decay,
-                                         self.frame, frame_decay, 0)
+            self.frame = cv2.addWeighted(
+                0, 1.0-frame_decay,
+                self.frame, frame_decay, 0)
 
         elif self.style == 1:
 
@@ -888,109 +858,73 @@ class Mask(Effect):
         w - toggle random walk
         -/+ - decrease/increase adaptive threshold kernel size
         [/] - decrease/increase median blur kernel size
-        ;/' - decrease/increase ?
+        ;/' - None
+        ,/. - decrease/increase random walk step size
         / - reset parameters
         q - quit mask effect
     """
 
     def __init__(self):
 
-        # background frame constants
-        self.THRESH_KERN_INIT = 15
-        self.THRESH_KERN_MIN = 3
-        self.THRESH_KERN_MAX = 75
-        self.THRESH_KERN_INC = 2
-        self.MEDIAN_KERN_INIT = 7
-        self.MEDIAN_KERN_MIN = 3
-        self.MEDIAN_KERN_MAX = 75
-        self.MEDIAN_KERN_INC = 2
-        # self.FRAME_EXP_RATE_INIT = 1.1
-        # self.FRAME_EXP_RATE_MIN = 1.01
-        # self.FRAME_EXP_RATE_MAX = 2.0
-        # self.FRAME_EXP_RATE_INC = 0.01
+        # user option constants
+        THRESH_KERN = {
+            'DESC': 'kernel size for thresholding operation',
+            'NAME': 'thresh_kern',
+            'VAL': 15,
+            'INIT': 15,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        MEDIAN_KERN = {
+            'DESC': 'kernel size for median filtering after threshold',
+            'NAME': 'median_kern',
+            'VAL': 7,
+            'INIT': 7,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        STEP_SIZE = {
+            'DESC': 'step size that scales random walk',
+            'NAME': 'step_size',
+            'VAL': 5.0,
+            'INIT': 5.0,
+            'MIN': 0.5,
+            'MAX': 15.0,
+            'STEP': 1.0,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'DESC': '',
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
         self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            THRESH_KERN,
+            MEDIAN_KERN,
+            NONE,
+            STEP_SIZE,
+            NONE,
+            NONE]
 
         # user options
         self.style = 0
-        self.thresh_kern = self.THRESH_KERN_INIT
-        self.median_kern = self.MEDIAN_KERN_INIT
-        self.step_size = 3.0                # step size of random walk (pixels)
-        self.reinitialize = False           # reset random walk
+        self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10, num_channels=6)
-
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
-        self.INC2 = False
-        self.DEC2 = False
-
-    def _process_io(self, key_list):
-
-        if key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('[')]:
-            key_list[ord('[')] = False
-            self.DEC1 = True
-        elif key_list[ord(']')]:
-            key_list[ord(']')] = False
-            self.INC1 = True
-        elif key_list[ord(';')]:
-            key_list[ord(';')] = False
-            self.DEC2 = True
-        elif key_list[ord('\'')]:
-            key_list[ord('\'')] = False
-            self.INC2 = True
-        elif key_list[ord('/')]:
-            key_list[ord('/')] = False
-            self.reinitialize = True
-        elif key_list[ord('t')]:
-            key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_STYLES
-            self.reinitialize = True
-        elif key_list[ord('w')]:
-            key_list[ord('w')] = False
-            self.random_walk = not self.random_walk
-            self.chan_vec_pos = np.zeros((3, 2))
-            self.noise.reinitialize()
-
-        # process options
-        if self.DEC0:
-            self.DEC0 = False
-            self.thresh_kern -= self.THRESH_KERN_INC
-        if self.INC0:
-            self.INC0 = False
-            self.thresh_kern += self.THRESH_KERN_INC
-        self.thresh_kern = np.clip(self.thresh_kern,
-                                   self.THRESH_KERN_MIN,
-                                   self.THRESH_KERN_MAX)
-
-        if self.DEC1:
-            self.DEC1 = False
-            self.median_kern -= self.MEDIAN_KERN_INC
-        if self.INC1:
-            self.INC1 = False
-            self.median_kern += self.MEDIAN_KERN_INC
-        self.median_kern = np.clip(self.median_kern,
-                                   self.MEDIAN_KERN_MIN,
-                                   self.MEDIAN_KERN_MAX)
-
-        # if self.DEC2:
-        #     self.DEC2 = False
-        #     self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
-        # if self.INC2:
-        #     self.INC2 = False
-        #     self.frame_exp_rate += self.FRAME_EXP_RATE_INC
-        # self.frame_exp_rate = np.clip(self.frame_exp_rate,
-        #                               self.FRAME_EXP_RATE_MIN,
-        #                               self.FRAME_EXP_RATE_MAX)
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
 
     def process(self, frame_orig, key_list, key_lock=False):
 
@@ -1002,30 +936,18 @@ class Mask(Effect):
 
         if self.reinitialize:
             self.reinitialize = False
-            self.thresh_kern = self.THRESH_KERN_INIT
-            self.median_kern = self.MEDIAN_KERN_INIT
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        thresh_kern = self.PROPS[0]['VAL']
+        median_kern = self.PROPS[1]['VAL']
+        step_size = self.PROPS[3]['VAL']
 
         # process image
         [im_height, im_width, _] = frame.shape
-
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if self.style == 0:
-            frame = cv2.adaptiveThreshold(frame_gray,
-                                          255,
-                                          cv2.ADAPTIVE_THRESH_MEAN_C,
-                                          cv2.THRESH_BINARY_INV,
-                                          self.thresh_kern,
-                                          5)
-        elif self.style == 1:
-            frame = cv2.adaptiveThreshold(frame_gray,
-                                          255,
-                                          cv2.ADAPTIVE_THRESH_MEAN_C,
-                                          cv2.THRESH_BINARY,
-                                          self.thresh_kern,
-                                          5)
-        frame = cv2.medianBlur(frame, self.median_kern)
 
         # random walk
         if self.random_walk:
@@ -1034,5 +956,27 @@ class Mask(Effect):
                 np.float32([[1, 0, self.chan_vec_pos[0, 0]],
                             [0, 1, self.chan_vec_pos[0, 1]]]),
                 (im_width, im_height))
+            # update noise values
+            self.chan_vec_pos += np.reshape(
+                step_size * self.noise.get_next_vals(), (3, 2))
+
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if self.style == 0:
+            frame = cv2.adaptiveThreshold(
+                frame_gray,
+                255,
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY_INV,
+                thresh_kern,
+                5)
+        elif self.style == 1:
+            frame = cv2.adaptiveThreshold(
+                frame_gray,
+                255,
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY,
+                thresh_kern,
+                5)
+        frame = cv2.medianBlur(frame, median_kern)
 
         return frame
