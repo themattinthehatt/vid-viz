@@ -637,113 +637,136 @@ class RGBBurst(Effect):
         -/+ - decrease/increase interval at which burst takes place
         [/] - decrease/increase frame decay rate (apparent speed)
         ;/' - decrease/increase frame expansion rate (tail length)
+        ,/. - None
         / - reset parameters
         q - quit rgbburst effect
     """
 
     def __init__(self):
 
-        # background frame constants
-        self.FRAME_INT_INIT = 10
-        self.FRAME_INT_MIN = 1
-        self.FRAME_INT_MAX = 100
-        self.FRAME_INT_INC = 1
-        self.FRAME_DECAY_INIT = 0.8
-        self.FRAME_DECAY_MIN = 0.3
-        self.FRAME_DECAY_MAX = 0.99
-        self.FRAME_DECAY_INC = 0.01
-        self.FRAME_EXP_RATE_INIT = 1.1
-        self.FRAME_EXP_RATE_MIN = 1.01
-        self.FRAME_EXP_RATE_MAX = 2.0
-        self.FRAME_EXP_RATE_INC = 0.01
+        # user option constants
+        FRAME_INT = {
+            'NAME': 'frame_interval',
+            'VAL': 10,
+            'INIT': 10,
+            'MIN': 1,
+            'MAX': 100,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        FRAME_DECAY = {
+            'NAME': 'frame_decay',
+            'VAL': 0.8,
+            'INIT': 0.8,
+            'MIN': 0.3,
+            'MAX': 0.99,
+            'STEP': 0.01,
+            'INC': False,
+            'DEC': False}
+        EXP_RATE = {
+            'NAME': 'frame_expansion_rate',
+            'VAL': 1.1,
+            'INIT': 1.1,
+            'MIN': 1.01,
+            'MAX': 2.0,
+            'STEP': 0.01,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
         self.MAX_NUM_STYLES = 3
 
-        # background frame parameters
-        self.frame_cnt = 0                              # frame counter
-        self.frame_int = self.FRAME_INT_INIT            # rgb burst interval
-        self.frame = None                               # background frame
-        self.frame_decay = self.FRAME_DECAY_INIT        # background decay rate
-        self.frame_exp_rate = self.FRAME_EXP_RATE_INIT  # background expansion
+        # combine dicts into a list for easy general access
+        self.PROPS = [FRAME_INT,
+                      FRAME_DECAY,
+                      EXP_RATE,
+                      NONE,
+                      NONE,
+                      NONE]
 
         # user options
         self.style = 0
-        self.step_size = 3.0                # step size of random walk (pixels)
-        self.reinitialize = False           # reset random walk
+        self.reinitialize = False
         self.random_walk = True
+        self.step_size = 3.0  # multiplier on random walk step size
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10, num_channels=6)
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
 
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
-        self.INC2 = False
-        self.DEC2 = False
+        # background frame parameters
+        self.frame_cnt = 0                              # frame counter
+        self.frame = None                               # background frame
 
-    def _process_io(self, key_list):
-
-        if key_list[ord('-')]:
-            key_list[ord('-')] = False
-            self.DEC0 = True
-        elif key_list[ord('=')]:
-            key_list[ord('=')] = False
-            self.INC0 = True
-        elif key_list[ord('[')]:
-            key_list[ord('[')] = False
-            self.DEC1 = True
-        elif key_list[ord(']')]:
-            key_list[ord(']')] = False
-            self.INC1 = True
-        elif key_list[ord(';')]:
-            key_list[ord(';')] = False
-            self.DEC2 = True
-        elif key_list[ord('\'')]:
-            key_list[ord('\'')] = False
-            self.INC2 = True
-        elif key_list[ord('/')]:
-            key_list[ord('/')] = False
-            self.reinitialize = True
-        elif key_list[ord('t')]:
-            key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_STYLES
-            self.reinitialize = True
-        elif key_list[ord('w')]:
-            key_list[ord('w')] = False
-            self.random_walk = not self.random_walk
-            self.chan_vec_pos = np.zeros((3, 2))
-            self.noise.reinitialize()
-
-        # process options
-        if self.DEC0:
-            self.DEC0 = False
-            self.frame_int -= self.FRAME_INT_INC
-        if self.INC0:
-            self.INC0 = False
-            self.frame_int += self.FRAME_INT_INC
-        self.frame_int = np.clip(self.frame_int,
-                                 self.FRAME_INT_MIN,
-                                 self.FRAME_INT_MAX)
-
-        if self.DEC1:
-            self.DEC1 = False
-            self.frame_decay -= self.FRAME_DECAY_INC
-        if self.INC1:
-            self.INC1 = False
-            self.frame_decay += self.FRAME_DECAY_INC
-        self.frame_decay = np.clip(self.frame_decay,
-                                   self.FRAME_DECAY_MIN,
-                                   self.FRAME_DECAY_MAX)
-
-        if self.DEC2:
-            self.DEC2 = False
-            self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
-        if self.INC2:
-            self.INC2 = False
-            self.frame_exp_rate += self.FRAME_EXP_RATE_INC
-        self.frame_exp_rate = np.clip(self.frame_exp_rate,
-                                      self.FRAME_EXP_RATE_MIN,
-                                      self.FRAME_EXP_RATE_MAX)
+    # def _process_io(self, key_list):
+    #
+    #     if key_list[ord('-')]:
+    #         key_list[ord('-')] = False
+    #         self.DEC0 = True
+    #     elif key_list[ord('=')]:
+    #         key_list[ord('=')] = False
+    #         self.INC0 = True
+    #     elif key_list[ord('[')]:
+    #         key_list[ord('[')] = False
+    #         self.DEC1 = True
+    #     elif key_list[ord(']')]:
+    #         key_list[ord(']')] = False
+    #         self.INC1 = True
+    #     elif key_list[ord(';')]:
+    #         key_list[ord(';')] = False
+    #         self.DEC2 = True
+    #     elif key_list[ord('\'')]:
+    #         key_list[ord('\'')] = False
+    #         self.INC2 = True
+    #     elif key_list[ord('/')]:
+    #         key_list[ord('/')] = False
+    #         self.reinitialize = True
+    #     elif key_list[ord('t')]:
+    #         key_list[ord('t')] = False
+    #         self.style = (self.style + 1) % self.MAX_NUM_STYLES
+    #         self.reinitialize = True
+    #     elif key_list[ord('w')]:
+    #         key_list[ord('w')] = False
+    #         self.random_walk = not self.random_walk
+    #         self.chan_vec_pos = np.zeros((3, 2))
+    #         self.noise.reinitialize()
+    #
+    #     # process options
+    #     if self.DEC0:
+    #         self.DEC0 = False
+    #         self.frame_int -= self.FRAME_INT_INC
+    #     if self.INC0:
+    #         self.INC0 = False
+    #         self.frame_int += self.FRAME_INT_INC
+    #     self.frame_int = np.clip(self.frame_int,
+    #                              self.FRAME_INT_MIN,
+    #                              self.FRAME_INT_MAX)
+    #
+    #     if self.DEC1:
+    #         self.DEC1 = False
+    #         self.frame_decay -= self.FRAME_DECAY_INC
+    #     if self.INC1:
+    #         self.INC1 = False
+    #         self.frame_decay += self.FRAME_DECAY_INC
+    #     self.frame_decay = np.clip(self.frame_decay,
+    #                                self.FRAME_DECAY_MIN,
+    #                                self.FRAME_DECAY_MAX)
+    #
+    #     if self.DEC2:
+    #         self.DEC2 = False
+    #         self.frame_exp_rate -= self.FRAME_EXP_RATE_INC
+    #     if self.INC2:
+    #         self.INC2 = False
+    #         self.frame_exp_rate += self.FRAME_EXP_RATE_INC
+    #     self.frame_exp_rate = np.clip(self.frame_exp_rate,
+    #                                   self.FRAME_EXP_RATE_MIN,
+    #                                   self.FRAME_EXP_RATE_MAX)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -758,11 +781,15 @@ class RGBBurst(Effect):
 
         if self.reinitialize:
             self.reinitialize = False
-            self.frame_int = self.FRAME_INT_INIT
-            self.frame_decay = self.FRAME_DECAY_INIT
-            self.frame_exp_rate = self.FRAME_EXP_RATE_INIT
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        frame_interval = self.PROPS[0]['VAL']
+        frame_decay = self.PROPS[1]['VAL']
+        frame_expansion_rate = self.PROPS[2]['VAL']
 
         # process image
         [im_height, im_width, _] = frame.shape
@@ -774,32 +801,29 @@ class RGBBurst(Effect):
                 np.float32([[1, 0, self.chan_vec_pos[0, 0]],
                             [0, 1, self.chan_vec_pos[0, 1]]]),
                 (im_width, im_height))
-
-        if self.style == 0:
-
             # update noise values
             self.chan_vec_pos += np.reshape(
                 self.step_size * self.noise.get_next_vals(), (3, 2))
+
+        if self.style == 0:
 
             # update background frame
             frame_exp = cv2.resize(self.frame,
                                    None,
-                                   fx=self.frame_exp_rate,
-                                   fy=self.frame_exp_rate,
+                                   fx=frame_expansion_rate,
+                                   fy=frame_expansion_rate,
                                    interpolation=cv2.INTER_LINEAR)
             [im_exp_height, im_exp_width, _] = frame_exp.shape
-            self.frame = cv2.getRectSubPix(frame_exp, (im_width, im_height),
-                                           (im_exp_width / 2, im_exp_height / 2))
-            self.frame = cv2.addWeighted(0, 1.0-self.frame_decay,
-                                         self.frame, self.frame_decay, 0)
+            self.frame = cv2.getRectSubPix(
+                frame_exp,
+                (im_width, im_height),
+                (im_exp_width / 2, im_exp_height / 2))
+            self.frame = cv2.addWeighted(0, 1.0-frame_decay,
+                                         self.frame, frame_decay, 0)
 
         elif self.style == 1:
 
             # same as style 0, but channels are differentially modulated
-
-            # update noise values
-            self.chan_vec_pos += np.reshape(
-                self.step_size * self.noise.get_next_vals(), (3, 2))
 
             # update background frame
             rate_diff = [1, 1.05, 1.1]
@@ -807,8 +831,8 @@ class RGBBurst(Effect):
                 frame_exp = cv2.resize(
                     self.frame[:, :, chan],
                     None,
-                    fx=self.frame_exp_rate*rate_diff[chan],
-                    fy=self.frame_exp_rate*rate_diff[chan],
+                    fx=frame_expansion_rate * rate_diff[chan],
+                    fy=frame_expansion_rate * rate_diff[chan],
                     interpolation=cv2.INTER_LINEAR)
                 [im_exp_height, im_exp_width] = frame_exp.shape
                 self.frame[:, :, chan] = cv2.getRectSubPix(
@@ -817,17 +841,13 @@ class RGBBurst(Effect):
                     (im_exp_width / 2,
                      im_exp_height / 2))
 
-            self.frame = cv2.addWeighted(0, 1.0 - self.frame_decay,
-                                         self.frame, self.frame_decay, 0)
+            self.frame = cv2.addWeighted(0, 1.0 - frame_decay,
+                                         self.frame, frame_decay, 0)
 
         elif self.style == 2:
 
             # same as style 1, but channels are differentially modulated using
             # grayscale image
-
-            # update noise values
-            self.chan_vec_pos += np.reshape(
-                self.step_size * self.noise.get_next_vals(), (3, 2))
 
             frame_gray = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)
 
@@ -837,8 +857,8 @@ class RGBBurst(Effect):
                 frame_exp = cv2.resize(
                     frame_gray,
                     None,
-                    fx=self.frame_exp_rate*rate_diff[chan],
-                    fy=self.frame_exp_rate*rate_diff[chan],
+                    fx=frame_expansion_rate * rate_diff[chan],
+                    fy=frame_expansion_rate * rate_diff[chan],
                     interpolation=cv2.INTER_LINEAR)
                 [im_exp_height, im_exp_width] = frame_exp.shape
                 self.frame[:, :, chan] = cv2.getRectSubPix(
@@ -847,13 +867,13 @@ class RGBBurst(Effect):
                     (im_exp_width / 2,
                      im_exp_height / 2))
 
-            self.frame = cv2.addWeighted(0, 1.0 - self.frame_decay,
-                                         self.frame, self.frame_decay, 0)
+            self.frame = cv2.addWeighted(0, 1.0 - frame_decay,
+                                         self.frame, frame_decay, 0)
 
         frame_ret = cv2.bitwise_or(self.frame, frame)
 
         # add new frame periodically
-        if self.frame_cnt % self.frame_int == 0:
+        if self.frame_cnt % frame_interval == 0:
             self.frame += frame
 
         return frame_ret
