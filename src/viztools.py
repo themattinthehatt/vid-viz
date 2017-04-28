@@ -656,7 +656,7 @@ class RGBBurst(Effect):
         self.FRAME_EXP_RATE_MIN = 1.01
         self.FRAME_EXP_RATE_MAX = 2.0
         self.FRAME_EXP_RATE_INC = 0.01
-        self.MAX_NUM_STYLES = 2
+        self.MAX_NUM_STYLES = 3
 
         # background frame parameters
         self.frame_cnt = 0                              # frame counter
@@ -794,23 +794,61 @@ class RGBBurst(Effect):
                                          self.frame, self.frame_decay, 0)
 
         elif self.style == 1:
-            pass
 
-        # frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # _, frame_gray = cv2.threshold(frame_gray,
-        #                               128, 255,
-        #                               cv2.THRESH_BINARY)
-        # frame[:, :, 0] = frame_gray
-        # frame[:, :, 1] = frame_gray
-        # frame[:, :, 2] = frame_gray
+            # same as style 0, but channels are differentially modulated
 
-        # translate channels
-        # for chan in range(3):
-        #     frame[:, :, chan] = cv2.warpAffine(
-        #         frame_gray,
-        #         np.float32([[1, 0, self.chan_vec_pos[chan, 0]],
-        #                     [0, 1, self.chan_vec_pos[chan, 1]]]),
-        #         (im_width, im_height))
+            # update noise values
+            self.chan_vec_pos += np.reshape(
+                self.step_size * self.noise.get_next_vals(), (3, 2))
+
+            # update background frame
+            rate_diff = [1, 1.05, 1.1]
+            for chan in range(3):
+                frame_exp = cv2.resize(
+                    self.frame[:, :, chan],
+                    None,
+                    fx=self.frame_exp_rate*rate_diff[chan],
+                    fy=self.frame_exp_rate*rate_diff[chan],
+                    interpolation=cv2.INTER_LINEAR)
+                [im_exp_height, im_exp_width] = frame_exp.shape
+                self.frame[:, :, chan] = cv2.getRectSubPix(
+                    frame_exp,
+                    (im_width, im_height),
+                    (im_exp_width / 2,
+                     im_exp_height / 2))
+
+            self.frame = cv2.addWeighted(0, 1.0 - self.frame_decay,
+                                         self.frame, self.frame_decay, 0)
+
+        elif self.style == 2:
+
+            # same as style 1, but channels are differentially modulated using
+            # grayscale image
+
+            # update noise values
+            self.chan_vec_pos += np.reshape(
+                self.step_size * self.noise.get_next_vals(), (3, 2))
+
+            frame_gray = cv2.cvtColor(self.frame, cv2.COLOR_RGB2GRAY)
+
+            # update background frame
+            rate_diff = [1, 1.05, 1.1]
+            for chan in range(3):
+                frame_exp = cv2.resize(
+                    frame_gray,
+                    None,
+                    fx=self.frame_exp_rate*rate_diff[chan],
+                    fy=self.frame_exp_rate*rate_diff[chan],
+                    interpolation=cv2.INTER_LINEAR)
+                [im_exp_height, im_exp_width] = frame_exp.shape
+                self.frame[:, :, chan] = cv2.getRectSubPix(
+                    frame_exp,
+                    (im_width, im_height),
+                    (im_exp_width / 2,
+                     im_exp_height / 2))
+
+            self.frame = cv2.addWeighted(0, 1.0 - self.frame_decay,
+                                         self.frame, self.frame_decay, 0)
 
         frame_ret = cv2.bitwise_or(self.frame, frame)
 
