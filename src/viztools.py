@@ -94,7 +94,7 @@ class Border(Effect):
         ;/' - rotate image left/right
         ,/. - None
         lrud arrows - translate image
-        q - quit border effect
+        backspace - quit border effect
     """
 
     def __init__(self):
@@ -255,6 +255,100 @@ class Border(Effect):
                     int(im_width * (1.0 - mult_factor) / 2),
                     int(im_width * (1.0 - mult_factor) / 2),
                     cv2.BORDER_REFLECT)
+
+        return frame
+
+
+class PostProcess(Effect):
+    """
+    Apply post-processing (image filtering) to final image
+
+    KEYBOARD INPUTS:
+        -/+ - decrease/increase gaussian smoothing kernel
+        [/] - decrease/increase median filtering kernel
+        ;/' - None
+        ,/. - None
+        lrud arrows - translate image
+    """
+
+    def __init__(self):
+
+        GAUSSIAN_KERN = {
+            'DESC': 'kernel size for gaussian smoothing',
+            'NAME': 'gauss_kern',
+            'VAL': 7,
+            'INIT': 7,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        MEDIAN_KERN = {
+            'DESC': 'kernel size for median filtering',
+            'NAME': 'median_kern',
+            'VAL': 7,
+            'INIT': 7,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'DESC': '',
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 3
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            GAUSSIAN_KERN,
+            MEDIAN_KERN,
+            NONE,
+            NONE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        gauss_kern = self.PROPS[0]['VAL']
+        median_kern = self.PROPS[1]['VAL']
+
+        # process image
+        [im_height, im_width, _] = frame.shape
+
+        # rotate
+        if self.style == 1:
+            frame_blurred = cv2.GaussianBlur(frame, (gauss_kern, gauss_kern), 0)
+            # frame = cv2.addWeighted(
+            #     frame, 0.5,
+            #     frame_blurred, 0.5, 0)
+            frame = cv2.bitwise_or(frame, frame_blurred)
+        elif self.style == 2:
+            frame = cv2.medianBlur(frame, median_kern)
 
         return frame
 
@@ -861,7 +955,7 @@ class Mask(Effect):
         ;/' - None
         ,/. - decrease/increase random walk step size
         / - reset parameters
-        q - quit mask effect
+        backspace - quit mask effect
     """
 
     def __init__(self):
