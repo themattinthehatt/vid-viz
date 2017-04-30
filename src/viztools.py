@@ -1236,3 +1236,161 @@ class HueCloud(Effect):
                     interpolation=cv2.INTER_LANCZOS4)
 
         return frame
+
+
+class HueBloom(Effect):
+    """
+    Create bloom effect around thresholded version of input frame
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk
+        -/+ - decrease/increase random matrix size
+        [/] - decrease/increase bloom size
+        ;/' - None
+        ,/. - None
+        / - reset parameters
+        q - quit huebloom effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        DIM_SIZE = {
+            'DESC': 'dimension of random matrix height/width',
+            'NAME': 'dim_size',
+            'VAL': 10,
+            'INIT': 10,
+            'MIN': 2,
+            'MAX': 100,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        BACKGROUND_SCALE = {
+            'DESC': 'reduction parameter for bloom substrate',
+            'NAME': 'background_scale',
+            'VAL': 0.10,
+            'INIT': 0.10,
+            'MIN': 0.01,
+            'MAX': 1.0,
+            'STEP': 0.01,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 3
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            DIM_SIZE,
+            BACKGROUND_SCALE,
+            NONE,
+            NONE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # frame parameters
+        self.prev_dim_size = DIM_SIZE['VAL']
+        self.frame = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
+        self.frame[:, :, 0] = np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((1, 1))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        dim_size = self.PROPS[0]['VAL']
+        # back_scale = self.PROPS[1]['VAL']
+
+        # change scale
+        int_val = np.floor(80.0 * self.noise.get_next_vals()) / 1000.0
+        back_scale = 0.15 + int_val
+
+        # process image
+        [im_height, im_width, _] = frame.shape
+
+        # create new random matrix if necessary
+        if int(dim_size) is not int(self.prev_dim_size):
+            self.prev_dim_size = dim_size
+            self.frame = np.ones((dim_size, dim_size, 3))
+            self.frame[:, :, 0] = np.random.rand(dim_size, dim_size)
+
+        # get background
+        frame_back = cv2.resize(
+            self.frame,
+            (im_width, im_height),
+            interpolation=cv2.INTER_CUBIC)
+        frame_back = 255.0 * frame_back
+        frame_back = frame_back.astype('uint8')
+        frame_back = cv2.cvtColor(frame_back, cv2.COLOR_HSV2BGR)
+
+        # get mask
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame_gray = cv2.medianBlur(frame_gray, 11)
+        frame_mask = cv2.adaptiveThreshold(
+            frame_gray,
+            255,  # thresh ceil
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY_INV,
+            21,   # thresh block
+            4     # thresh bias
+        )
+        frame_mask2 = cv2.adaptiveThreshold(
+            frame_gray,
+            255,  # thresh ceil
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY,
+            21,   # thresh block
+            4     # thresh bias
+        )
+
+        # get blurred, masked background
+        frame_back2 = frame_back
+        for chan in range(3):
+            frame_back2[:, :, chan] = cv2.bitwise_and(
+                frame_back[:, :, chan],
+                frame_mask)
+        frame_back2 = cv2.resize(
+            frame_back2,
+            None,
+            fx=back_scale,
+            fy=back_scale,
+            interpolation=cv2.INTER_LINEAR)
+        frame_back2 = cv2.GaussianBlur(frame_back2, (5, 5), 0)
+        frame_back2 = cv2.resize(
+            frame_back2,
+            (im_width, im_height),
+            interpolation=cv2.INTER_LINEAR)
+
+        # remask blurred background
+        frame = frame_back2
+        for chan in range(3):
+            frame[:, :, chan] = cv2.bitwise_and(
+                frame_back2[:, :, chan],
+                frame_mask2)
+
+        return frame
