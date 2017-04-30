@@ -1074,3 +1074,165 @@ class Mask(Effect):
         frame = cv2.medianBlur(frame, median_kern)
 
         return frame
+
+
+class HueCloud(Effect):
+    """
+    Use random values to modulate hue channel
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk
+        -/+ - decrease/increase random matrix size
+        [/] - None
+        ;/' - None
+        ,/. - None
+        / - reset parameters
+        q - quit huecloud effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        DIM_SIZE = {
+            'DESC': 'dimension of random matrix height/width',
+            'NAME': 'dim_size',
+            'VAL': 40,
+            'INIT': 40,
+            'MIN': 2,
+            'MAX': 200,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 3
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            DIM_SIZE,
+            NONE,
+            NONE,
+            NONE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # frame parameters
+        self.use_hsv = 1
+        self.frame_dim = 500
+        self.frame = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
+        self.frame[:, :, 0] = np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        dim_size = self.PROPS[0]['VAL']
+
+        # process image
+        [im_height, _, _] = self.frame.shape
+
+        if self.use_hsv:
+
+            # create new random matrix if necessary
+            if im_height is not int(dim_size):
+                self.frame = np.ones((dim_size, dim_size, 3))
+                self.frame[:, :, 0] = np.random.rand(dim_size, dim_size)
+
+            # transform random matrix into image
+            frame_hsv = np.copy(self.frame)
+            frame_hsv = 255.0 * frame_hsv
+            frame_hsv = frame_hsv.astype('uint8')
+
+            if self.style == 0:
+
+                # update background frame
+                frame = cv2.resize(
+                    frame_hsv,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_LINEAR)
+
+            elif self.style == 1:
+
+                # same as style 0, but uses bicubic interpolation
+
+                frame = cv2.resize(
+                    frame_hsv,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_CUBIC)
+
+            elif self.style == 2:
+
+                # same as style 0, but uses bicubic interpolation
+
+                frame = cv2.resize(
+                    frame_hsv,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_LANCZOS4)
+
+            # convert from hsv to rgb
+            frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
+
+        else:
+
+            # create new random matrix if necessary
+            if im_height is not int(dim_size):
+                self.frame = np.random.rand(dim_size, dim_size, 3)
+
+            # transform random matrix into image
+            frame = np.copy(self.frame)
+            frame = 255.0 * frame
+            frame = frame.astype('uint8')
+
+            if self.style == 0:
+
+                # update background frame
+                frame = cv2.resize(
+                    frame,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_LINEAR)
+
+            elif self.style == 1:
+
+                # same as style 0, but uses bicubic interpolation
+
+                frame = cv2.resize(
+                    frame,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_CUBIC)
+
+            elif self.style == 2:
+
+                # same as style 0, but uses bicubic interpolation
+
+                frame = cv2.resize(
+                    frame,
+                    (self.frame_dim, self.frame_dim),
+                    interpolation=cv2.INTER_LANCZOS4)
+
+        return frame
