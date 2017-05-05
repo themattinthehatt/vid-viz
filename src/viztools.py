@@ -1470,7 +1470,7 @@ class HueSwirl2(Effect):
             'NAME': 'mask_blur',
             'VAL': 5,
             'INIT': 5,
-            'MIN': 1,
+            'MIN': 3,
             'MAX': 31,
             'STEP': 2,
             'INC': False,
@@ -1481,7 +1481,7 @@ class HueSwirl2(Effect):
             'VAL': 0,
             'INIT': 0,
             'MIN': 0,
-            'MAX': 50,
+            'MAX': 75,
             'STEP': 1,
             'INC': False,
             'DEC': False}
@@ -1525,8 +1525,15 @@ class HueSwirl2(Effect):
 
         # control parameters
         self.increase_index = True
+        self.increase_meta_index = True
 
     def process(self, frame, key_list, key_lock=False):
+
+        # update if blur kernel toggled
+        if key_list[ord('t')]:
+            reset_iter_seq = True
+        else:
+            reset_iter_seq = False
 
         # process keyboard input
         if not key_lock:
@@ -1541,6 +1548,7 @@ class HueSwirl2(Effect):
             self.frame_mask_list = \
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
             self.increase_index = True
+            self.increase_meta_index = True
 
         # control parameters
         if self.increase_index:
@@ -1551,6 +1559,16 @@ class HueSwirl2(Effect):
             self.increase_index = False
         if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
             self.increase_index = True
+            # change meta index
+            if self.increase_meta_index:
+                self.PROPS[2]['VAL'] += self.PROPS[2]['STEP']
+            else:
+                self.PROPS[2]['VAL'] -= self.PROPS[2]['STEP']
+            if self.PROPS[2]['VAL'] == self.PROPS[2]['MAX']:
+                self.increase_meta_index = False
+            if self.PROPS[2]['VAL'] == self.PROPS[2]['MIN']:
+                self.increase_meta_index = True
+                self.style = (self.style + 1) % self.MAX_NUM_STYLES
 
         # human-readable names
         dim_size = self.PROPS[0]['VAL']
@@ -1583,14 +1601,13 @@ class HueSwirl2(Effect):
             self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
 
         # get mask if necessary
-        if int(mask_blur) is not int(self.prev_mask_blur):
+        if int(mask_blur) is not int(self.prev_mask_blur) or reset_iter_seq:
             # blur kernel changed; restart iteration sequence
             self.PROPS[4]['VAL'] = self.PROPS[4]['INIT']
             iter_index = self.PROPS[4]['VAL']
             self.increase_index = True
             self.frame_mask_list = \
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
-
             # get new mask
             self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # frame_gray = cv2.medianBlur(frame_gray, 11)
