@@ -192,7 +192,10 @@ class Border(Effect):
         shift_horz = self.PROPS[5]['VAL']
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         # rotate
         if rot_angle is not 0:
@@ -223,7 +226,7 @@ class Border(Effect):
             frame = cv2.resize(frame, (im_width, im_height))
 
         # add borders
-        if self.style == 1:
+        if self.style is 1:
             # resize frame
             frame = cv2.resize(
                 frame, None,
@@ -239,7 +242,7 @@ class Border(Effect):
                     int(im_width * (1.0 - mult_factor) / 2),
                     int(im_width * (1.0 - mult_factor) / 2),
                     cv2.BORDER_WRAP)
-        elif self.style == 2:
+        elif self.style is 2:
             # resize frame
             frame = cv2.resize(
                 frame, None,
@@ -338,16 +341,19 @@ class PostProcess(Effect):
         median_kern = self.PROPS[1]['VAL']
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         # rotate
-        if self.style == 1:
+        if self.style is 1:
             frame_blurred = cv2.GaussianBlur(frame, (gauss_kern, gauss_kern), 0)
             # frame = cv2.addWeighted(
             #     frame, 0.5,
             #     frame_blurred, 0.5, 0)
             frame = cv2.bitwise_or(frame, frame_blurred)
-        elif self.style == 2:
+        elif self.style is 2:
             frame = cv2.medianBlur(frame, median_kern)
 
         return frame
@@ -410,9 +416,9 @@ class Threshold(Effect):
                 self.style = (self.style + 1) % self.MAX_NUM_THRESH_STYLES
 
         # process options
-        if self.style == 0:
+        if self.style is 0:
             self.THRESH_TYPE = cv2.THRESH_BINARY
-        elif self.style == 1:
+        elif self.style is 1:
             self.THRESH_TYPE = cv2.THRESH_BINARY_INV
 
         for chan in range(3):
@@ -433,11 +439,11 @@ class Threshold(Effect):
             self.THRESH_BLOCK,
             self.THRESH_C)
         for chan in range(3):
-            if self.chan_style[chan] == 1:
+            if self.chan_style[chan] is 1:
                 frame[:, :, chan] = 0
-            elif self.chan_style[chan] == 2:
+            elif self.chan_style[chan] is 2:
                 frame[:, :, chan] = 255
-            elif self.chan_style[chan] == 3:
+            elif self.chan_style[chan] is 3:
                 frame[:, :, chan] = frame_thresh
 
         if not self.optimize:
@@ -559,13 +565,13 @@ class Alien(Effect):
         frame.astype('float16')
 
         for chan in range(3):
-            if self.chan_style[chan] == 0:
+            if self.chan_style[chan] is 0:
                 frame[:, :, chan] = frame_orig[:, :, chan]
-            elif self.chan_style[chan] == 1:
+            elif self.chan_style[chan] is 1:
                 frame[:, :, chan] = 0
-            elif self.chan_style[chan] == 2:
+            elif self.chan_style[chan] is 2:
                 frame[:, :, chan] = 255
-            elif self.chan_style[chan] == 3:
+            elif self.chan_style[chan] is 3:
                 frame[:, :, chan] = 128 + 127 * np.cos(frame[:, :, chan] *
                                                        self.chan_freq[chan] +
                                                        self.chan_phase[chan])
@@ -582,9 +588,9 @@ class Alien(Effect):
         #
         # # threshold to clean up effect
         # if THRESH:
-        #     if THRESH_STYLE == 0:
+        #     if THRESH_STYLE is 0:
         #         THRESH_TYPE = cv2.THRESH_BINARY
-        #     elif THRESH_STYLE == 1:
+        #     elif THRESH_STYLE is 1:
         #         THRESH_TYPE = cv2.THRESH_BINARY_INV
         #
         #     # MEAN_C | GAUSSIAN_C
@@ -593,19 +599,19 @@ class Alien(Effect):
         #     THRESH_BLOCK = 15
         #     THRESH_C = 5
         #
-        #     if ALIEN_R_CH_STYLE == 3:
+        #     if ALIEN_R_CH_STYLE is 3:
         #         frame[:, :, 2] = cv2.adaptiveThreshold(frame[:, :, 2],
         #                                                THRESH_CEIL,
         #                                                ADAPTIVE_THRESH_TYPE,
         #                                                THRESH_TYPE,
         #                                                THRESH_BLOCK, THRESH_C)
-        #     if ALIEN_G_CH_STYLE == 3:
+        #     if ALIEN_G_CH_STYLE is 3:
         #         frame[:, :, 1] = cv2.adaptiveThreshold(frame[:, :, 1],
         #                                                THRESH_CEIL,
         #                                                ADAPTIVE_THRESH_TYPE,
         #                                                THRESH_TYPE,
         #                                                THRESH_BLOCK, THRESH_C)
-        #     if ALIEN_B_CH_STYLE == 3:
+        #     if ALIEN_B_CH_STYLE is 3:
         #         frame[:, :, 0] = cv2.adaptiveThreshold(frame[:, :, 0],
         #                                                THRESH_CEIL,
         #                                                ADAPTIVE_THRESH_TYPE,
@@ -700,7 +706,11 @@ class RGBWalk(Effect):
         step_size = self.PROPS[3]['VAL']
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
+
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         frame_gray = cv2.adaptiveThreshold(
             frame_gray, 255,
@@ -713,7 +723,7 @@ class RGBWalk(Effect):
             step_size * self.noise.get_next_vals(), (3, 2))
 
         # translate channels
-        if self.style == 0:
+        if self.style is 0:
 
             for chan in range(3):
                 frame[:, :, chan] = cv2.warpAffine(
@@ -722,7 +732,7 @@ class RGBWalk(Effect):
                                 [0, 1, self.chan_vec_pos[chan, 1]]]),
                     (im_width, im_height))
 
-        elif self.style == 1:
+        elif self.style is 1:
 
             x_dir = self.chan_vec_pos[0, 1]
             y_dir = self.chan_vec_pos[1, 1]
@@ -832,7 +842,7 @@ class RGBBurst(Effect):
     def process(self, frame, key_list, key_lock=False):
 
         # update frame info
-        if self.frame_cnt == 0:
+        if self.frame_cnt is 0:
             self.frame = frame
         self.frame_cnt += 1
 
@@ -854,7 +864,10 @@ class RGBBurst(Effect):
         step_size = self.PROPS[3]['VAL']
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         # random walk
         if self.random_walk:
@@ -867,7 +880,7 @@ class RGBBurst(Effect):
             self.chan_vec_pos += np.reshape(
                 step_size * self.noise.get_next_vals(), (3, 2))
 
-        if self.style == 0:
+        if self.style is 0:
 
             # update background frame
             frame_exp = cv2.resize(
@@ -885,7 +898,7 @@ class RGBBurst(Effect):
                 0, 1.0-frame_decay,
                 self.frame, frame_decay, 0)
 
-        elif self.style == 1:
+        elif self.style is 1:
 
             # same as style 0, but channels are differentially modulated
 
@@ -908,7 +921,7 @@ class RGBBurst(Effect):
             self.frame = cv2.addWeighted(0, 1.0 - frame_decay,
                                          self.frame, frame_decay, 0)
 
-        elif self.style == 2:
+        elif self.style is 2:
 
             # same as style 1, but channels are differentially modulated using
             # grayscale image
@@ -937,7 +950,7 @@ class RGBBurst(Effect):
         frame_ret = cv2.bitwise_or(self.frame, frame)
 
         # add new frame periodically
-        if self.frame_cnt % frame_interval == 0:
+        if self.frame_cnt % frame_interval is 0:
             self.frame += frame
 
         return frame_ret
@@ -1041,7 +1054,10 @@ class Mask(Effect):
         step_size = self.PROPS[3]['VAL']
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         # random walk
         if self.random_walk:
@@ -1055,7 +1071,7 @@ class Mask(Effect):
                 step_size * self.noise.get_next_vals(), (3, 2))
 
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if self.style == 0:
+        if self.style is 0:
             frame = cv2.adaptiveThreshold(
                 frame_gray,
                 255,
@@ -1063,7 +1079,7 @@ class Mask(Effect):
                 cv2.THRESH_BINARY_INV,
                 thresh_kern,
                 5)
-        elif self.style == 1:
+        elif self.style is 1:
             frame = cv2.adaptiveThreshold(
                 frame_gray,
                 255,
@@ -1155,7 +1171,10 @@ class HueCloud(Effect):
         dim_size = self.PROPS[0]['VAL']
 
         # process image
-        [im_height, _, _] = self.frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         if self.use_hsv:
 
@@ -1169,7 +1188,7 @@ class HueCloud(Effect):
             frame_hsv = 255.0 * frame_hsv
             frame_hsv = frame_hsv.astype('uint8')
 
-            if self.style == 0:
+            if self.style is 0:
 
                 # update background frame
                 frame = cv2.resize(
@@ -1177,7 +1196,7 @@ class HueCloud(Effect):
                     (self.frame_dim, self.frame_dim),
                     interpolation=cv2.INTER_LINEAR)
 
-            elif self.style == 1:
+            elif self.style is 1:
 
                 # same as style 0, but uses bicubic interpolation
 
@@ -1186,7 +1205,7 @@ class HueCloud(Effect):
                     (self.frame_dim, self.frame_dim),
                     interpolation=cv2.INTER_CUBIC)
 
-            elif self.style == 2:
+            elif self.style is 2:
 
                 # same as style 0, but uses bicubic interpolation
 
@@ -1209,7 +1228,7 @@ class HueCloud(Effect):
             frame = 255.0 * frame
             frame = frame.astype('uint8')
 
-            if self.style == 0:
+            if self.style is 0:
 
                 # update background frame
                 frame = cv2.resize(
@@ -1217,7 +1236,7 @@ class HueCloud(Effect):
                     (self.frame_dim, self.frame_dim),
                     interpolation=cv2.INTER_LINEAR)
 
-            elif self.style == 1:
+            elif self.style is 1:
 
                 # same as style 0, but uses bicubic interpolation
 
@@ -1226,7 +1245,7 @@ class HueCloud(Effect):
                     (self.frame_dim, self.frame_dim),
                     interpolation=cv2.INTER_CUBIC)
 
-            elif self.style == 2:
+            elif self.style is 2:
 
                 # same as style 0, but uses bicubic interpolation
 
@@ -1331,7 +1350,10 @@ class HueBloom(Effect):
         back_scale = 0.15 + int_val
 
         # process image
-        [im_height, im_width, _] = frame.shape
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
 
         # create new random matrix if necessary
         if int(dim_size) is not int(self.prev_dim_size):
@@ -1392,5 +1414,176 @@ class HueBloom(Effect):
             frame[:, :, chan] = cv2.bitwise_and(
                 frame_back2[:, :, chan],
                 frame_mask2)
+
+        return frame
+
+
+class HueSwirl(Effect):
+    """
+    Create bloom effect around thresholded version of input frame then melt it
+    with iteratively applying blur kernels
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk
+        -/+ - decrease/increase random matrix size
+        [/] - decrease/increase bloom size
+        ;/' - None
+        ,/. - None
+        / - reset parameters
+        q - quit hueswirleffect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        DIM_SIZE = {
+            'DESC': 'dimension of background random matrix height/width',
+            'NAME': 'dim_size',
+            'VAL': 2,
+            'INIT': 2,
+            'MIN': 2,
+            'MAX': 100,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        BACKGROUND_BLUR_KERNEL = {
+            'DESC': 'kernel size for Gaussian blur that produces bloom',
+            'NAME': 'back_blur',
+            'VAL': 19,
+            'INIT': 19,
+            'MIN': 3,
+            'MAX': 31,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        MASK_BLUR_KERNEL = {
+            'DESC': 'kernel size for Gauss/med blur that acts on mask',
+            'NAME': 'mask_blur',
+            'VAL': 5,
+            'INIT': 5,
+            'MIN': 1,
+            'MAX': 31,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            DIM_SIZE,
+            BACKGROUND_BLUR_KERNEL,
+            MASK_BLUR_KERNEL,
+            NONE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # frame parameters
+        self.prev_mask_blur = MASK_BLUR_KERNEL['VAL']
+        self.prev_dim_size = DIM_SIZE['VAL']
+        self.frame_back_0 = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
+        self.frame_back_0[:, :, 0] = \
+            np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+        self.frame_back = None
+        self.frame_mask = None
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((1, 1))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        dim_size = self.PROPS[0]['VAL']
+        back_blur = self.PROPS[1]['VAL']
+        mask_blur = self.PROPS[2]['VAL']
+
+        # process image
+        if len(frame.shape) is 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) is 2:
+            [im_height, im_width] = frame.shape
+
+        # create new random matrix if necessary
+        if int(dim_size) is not int(self.prev_dim_size):
+            self.prev_dim_size = dim_size
+            self.frame_back_0 = np.ones((dim_size, dim_size, 3))
+            self.frame_back_0[:, :, 0] = np.random.rand(dim_size, dim_size)
+            self.frame_back = None
+
+        # create background frame if necessary
+        if self.frame_back is None:
+            # get resized background
+            self.frame_back = cv2.resize(
+                self.frame_back_0,
+                (im_width, im_height),
+                interpolation=cv2.INTER_CUBIC)
+            self.frame_back = 255.0 * self.frame_back
+            self.frame_back = self.frame_back.astype('uint8')
+            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
+
+        # get mask if necessary
+        if self.frame_mask is None or \
+                int(mask_blur) is not int(self.prev_mask_blur):
+            self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # frame_gray = cv2.medianBlur(frame_gray, 11)
+            # self.frame_mask = cv2.adaptiveThreshold(
+            #     frame_gray,
+            #     255,  # thresh ceil
+            #     cv2.ADAPTIVE_THRESH_MEAN_C,
+            #     cv2.THRESH_BINARY_INV,
+            #     21,  # thresh block
+            #     4)  # thresh bias
+            self.prev_mask_blur = mask_blur
+        elif self.style is 0:
+            self.frame_mask = cv2.medianBlur(self.frame_mask, mask_blur)
+        elif self.style is 1:
+            self.frame_mask = cv2.GaussianBlur(
+                self.frame_mask,
+                (mask_blur, mask_blur),
+                0)
+
+        # get masked then blurred background
+        frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
+        for chan in range(3):
+            frame_back_blurred[:, :, chan] = cv2.bitwise_and(
+                self.frame_back[:, :, chan],
+                self.frame_mask)
+        frame_back_blurred = cv2.GaussianBlur(
+            frame_back_blurred,
+            (back_blur, back_blur),
+            0)
+
+        # remask blurred background
+        frame = np.zeros(self.frame_back.shape, dtype='uint8')
+        for chan in range(3):
+            frame[:, :, chan] = cv2.bitwise_and(
+                frame_back_blurred[:, :, chan],
+                255 - self.frame_mask)
 
         return frame
