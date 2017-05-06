@@ -1610,7 +1610,9 @@ class HueSwirl2(Effect):
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
             # get new mask
             self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # frame_gray = cv2.medianBlur(frame_gray, 11)
+            # frame_gray = cv2.medianBlur(
+            #     cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+            #     11)
             # self.frame_mask = cv2.adaptiveThreshold(
             #     frame_gray,
             #     255,  # thresh ceil
