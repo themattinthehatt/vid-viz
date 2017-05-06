@@ -41,7 +41,7 @@ class SmoothNoise(object):
             np.mean(self.noise_samples, axis=0)
 
 
-def resize(frame, frame_width, frame_height):
+def resize(frame, frame_width, frame_height, interpolation=cv2.INTER_LINEAR):
     """
     Function to resize a given frame while maintaining the original aspect 
     ratio
@@ -83,6 +83,6 @@ def resize(frame, frame_width, frame_height):
     frame = cv2.resize(
         frame,
         (frame_width, frame_height),
-        interpolation=cv2.INTER_LINEAR)
+        interpolation=interpolation)
 
     return frame

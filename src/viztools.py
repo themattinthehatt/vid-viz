@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 
 import cv2
 import numpy as np
@@ -9,6 +10,8 @@ import utils as util
 - classes that need refactoring with list/list
     threshold
     alien
+- have each class call Effect (base class) constructor
+- add print statements
 """
 
 
@@ -355,6 +358,142 @@ class PostProcess(Effect):
             frame = cv2.bitwise_or(frame, frame_blurred)
         elif self.style == 2:
             frame = cv2.medianBlur(frame, median_kern)
+
+        return frame
+
+
+class Mask(Effect):
+    """
+    Manipulate mask on image
+
+    KEYBOARD INPUTS:
+        t - toggle between mask and inverse
+        w - toggle random walk
+        -/+ - decrease/increase adaptive threshold kernel size
+        [/] - decrease/increase median blur kernel size
+        ;/' - None
+        ,/. - decrease/increase random walk step size
+        / - reset parameters
+        backspace - quit mask effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        THRESH_KERN = {
+            'DESC': 'kernel size for thresholding operation',
+            'NAME': 'thresh_kern',
+            'VAL': 15,
+            'INIT': 15,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        MEDIAN_KERN = {
+            'DESC': 'kernel size for median filtering after threshold',
+            'NAME': 'median_kern',
+            'VAL': 7,
+            'INIT': 7,
+            'MIN': 3,
+            'MAX': 75,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        STEP_SIZE = {
+            'DESC': 'step size that scales random walk',
+            'NAME': 'step_size',
+            'VAL': 5.0,
+            'INIT': 5.0,
+            'MIN': 0.5,
+            'MAX': 15.0,
+            'STEP': 1.0,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'DESC': '',
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            THRESH_KERN,
+            MEDIAN_KERN,
+            NONE,
+            STEP_SIZE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+    def process(self, frame_orig, key_list, key_lock=False):
+
+        frame = np.copy(frame_orig)
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        thresh_kern = self.PROPS[0]['VAL']
+        median_kern = self.PROPS[1]['VAL']
+        step_size = self.PROPS[3]['VAL']
+
+        # process image
+        if len(frame.shape) == 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) == 2:
+            [im_height, im_width] = frame.shape
+
+        # random walk
+        if self.random_walk:
+            frame = cv2.warpAffine(
+                frame,
+                np.float32([[1, 0, self.chan_vec_pos[0, 0]],
+                            [0, 1, self.chan_vec_pos[0, 1]]]),
+                (im_width, im_height))
+            # update noise values
+            self.chan_vec_pos += np.reshape(
+                step_size * self.noise.get_next_vals(), (3, 2))
+
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if self.style == 0:
+            frame = cv2.adaptiveThreshold(
+                frame_gray,
+                255,
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY_INV,
+                thresh_kern,
+                5)
+        elif self.style == 1:
+            frame = cv2.adaptiveThreshold(
+                frame_gray,
+                255,
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY,
+                thresh_kern,
+                5)
+        frame = cv2.medianBlur(frame, median_kern)
 
         return frame
 
@@ -956,142 +1095,6 @@ class RGBBurst(Effect):
         return frame_ret
 
 
-class Mask(Effect):
-    """
-    Manipulate mask on image
-
-    KEYBOARD INPUTS:
-        t - toggle between mask and inverse
-        w - toggle random walk
-        -/+ - decrease/increase adaptive threshold kernel size
-        [/] - decrease/increase median blur kernel size
-        ;/' - None
-        ,/. - decrease/increase random walk step size
-        / - reset parameters
-        backspace - quit mask effect
-    """
-
-    def __init__(self):
-
-        # user option constants
-        THRESH_KERN = {
-            'DESC': 'kernel size for thresholding operation',
-            'NAME': 'thresh_kern',
-            'VAL': 15,
-            'INIT': 15,
-            'MIN': 3,
-            'MAX': 75,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        MEDIAN_KERN = {
-            'DESC': 'kernel size for median filtering after threshold',
-            'NAME': 'median_kern',
-            'VAL': 7,
-            'INIT': 7,
-            'MIN': 3,
-            'MAX': 75,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        STEP_SIZE = {
-            'DESC': 'step size that scales random walk',
-            'NAME': 'step_size',
-            'VAL': 5.0,
-            'INIT': 5.0,
-            'MIN': 0.5,
-            'MAX': 15.0,
-            'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'DESC': '',
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
-
-        # combine dicts into a list for easy general access
-        self.PROPS = [
-            THRESH_KERN,
-            MEDIAN_KERN,
-            NONE,
-            STEP_SIZE,
-            NONE,
-            NONE]
-
-        # user options
-        self.style = 0
-        self.reinitialize = False
-        self.random_walk = False
-        self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
-
-    def process(self, frame_orig, key_list, key_lock=False):
-
-        frame = np.copy(frame_orig)
-
-        # process keyboard input
-        if not key_lock:
-            self._process_io(key_list)
-
-        if self.reinitialize:
-            self.reinitialize = False
-            self.chan_vec_pos = np.zeros((3, 2))
-            self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
-
-        # human-readable names
-        thresh_kern = self.PROPS[0]['VAL']
-        median_kern = self.PROPS[1]['VAL']
-        step_size = self.PROPS[3]['VAL']
-
-        # process image
-        if len(frame.shape) == 3:
-            [im_height, im_width, _] = frame.shape
-        elif len(frame.shape) == 2:
-            [im_height, im_width] = frame.shape
-
-        # random walk
-        if self.random_walk:
-            frame = cv2.warpAffine(
-                frame,
-                np.float32([[1, 0, self.chan_vec_pos[0, 0]],
-                            [0, 1, self.chan_vec_pos[0, 1]]]),
-                (im_width, im_height))
-            # update noise values
-            self.chan_vec_pos += np.reshape(
-                step_size * self.noise.get_next_vals(), (3, 2))
-
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if self.style == 0:
-            frame = cv2.adaptiveThreshold(
-                frame_gray,
-                255,
-                cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY_INV,
-                thresh_kern,
-                5)
-        elif self.style == 1:
-            frame = cv2.adaptiveThreshold(
-                frame_gray,
-                255,
-                cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY,
-                thresh_kern,
-                5)
-        frame = cv2.medianBlur(frame, median_kern)
-
-        return frame
-
-
 class HueBloom(Effect):
     """
     Create bloom effect around thresholded version of input frame
@@ -1256,7 +1259,8 @@ class HueBloom(Effect):
 class HueSwirl(Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
-    with iteratively applying blur kernels
+    with iteratively applying blur kernels; HueSwirl2 performs same operation 
+    but has more automated behavior
 
     KEYBOARD INPUTS:
         t - toggle between effect types
@@ -1428,7 +1432,12 @@ class HueSwirl(Effect):
 class HueSwirl2(Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
-    with iteratively applying blur kernels
+    with iteratively applying blur kernels. Iterative blur occurs 
+    automatically until reaching a stopping point defined in ITER_INDEX dict,
+    then reverses until no blur occurs. Then an automatic change in the mask 
+    blur kernel size occurs, and the iterative blur kernel operation continues
+    again. Once the entire loop has gone back and forth in blur kernel size 
+    space the blur type is switched from median to Gaussian or vice-versa.
 
     KEYBOARD INPUTS:
         t - toggle between effect types
@@ -1687,5 +1696,179 @@ class HueSwirl2(Effect):
             frame[:, :, chan] = cv2.bitwise_and(
                 frame_back_blurred[:, :, chan],
                 255 - self.frame_mask)
+
+        return frame
+
+
+class HueCrusher(Effect):
+    """
+    Takes an input frame and partitions the hue values into a discrete number 
+    of (equally spaced) continuous chunks. Can modify the center of the chunks 
+    as well as their width.
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk
+        -/+ - decrease/increase number of discrete chunks that divide huespace
+        [/] - decrease/increase offset to all chunk centers
+        ;/' - decrease/increase width of chunks
+        ,/. - None
+        lrud arrows - None
+        / - reset parameters
+        q - quit huecrusher effect
+    """
+
+    def __init__(self):
+
+        # user option constants
+        NUM_CHUNKS = {
+            'DESC': 'number of chunks that divide huespace',
+            'NAME': 'num_chunks',
+            'VAL': 3,
+            'INIT': 3,
+            'MIN': 1,
+            'MAX': 10,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        CENTER_OFFSET = {
+            'DESC': 'offset value to apply to chunk centers',
+            'NAME': 'center_offset',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -np.inf,
+            'MAX': np.inf,
+            'STEP': 5,
+            'INC': False,
+            'DEC': False}
+        CHUNK_WIDTH = {
+            'DESC': 'width of each chunk in huespace',
+            'NAME': 'chunk_width',
+            'VAL': 16,
+            'INIT': 16,
+            'MIN': 3,
+            'MAX': 180,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 1
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            NUM_CHUNKS,
+            CENTER_OFFSET,
+            CHUNK_WIDTH,
+            NONE,
+            NONE,
+            NONE]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # chunk params
+        num_chunks = NUM_CHUNKS['VAL']
+        self.num_chunks_prev = num_chunks
+
+        self.chunk_widths_og = int(180 / num_chunks)
+        self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+        for chunk in range(num_chunks):
+            self.chunk_range_mins[chunk] = \
+                chunk * self.chunk_widths_og
+            self.chunk_range_maxs[chunk] = \
+                (chunk + 1) * self.chunk_widths_og - 1
+            self.chunk_centers[chunk] = self.chunk_range_mins[chunk] + \
+                int(self.chunk_widths_og / 2)
+        self.chunk_range_maxs[-1] = 179
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        # # mod out offset so it can circle around hue-space
+        # self.PROPS[1]['VAL'] = self.PROPS[1]['VAL'] % 180
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((1, 1))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        num_chunks = self.PROPS[0]['VAL']
+        center_offset = self.PROPS[1]['VAL']
+        chunk_width = self.PROPS[2]['VAL']
+
+        # process image
+        if len(frame.shape) == 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) == 2:
+            [im_height, im_width] = frame.shape
+
+        # update params if number of chunks has been changed
+        if int(num_chunks) is not int(self.num_chunks_prev):
+            self.num_chunks_prev = num_chunks
+            self.chunk_widths_og = int(180 / num_chunks)
+            self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
+            self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
+            self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+            for chunk in range(num_chunks):
+                self.chunk_range_mins[chunk] = \
+                    chunk * self.chunk_widths_og
+                self.chunk_range_maxs[chunk] = \
+                    (chunk + 1) * self.chunk_widths_og - 1
+                self.chunk_centers[chunk] = self.chunk_range_mins[chunk] + \
+                    int(self.chunk_widths_og / 2)
+            self.chunk_range_maxs[-1] = 179
+
+        # extract hue values
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        hue_final = np.zeros((im_height, im_width), dtype='uint8')
+
+        # scale whole image
+        scale = chunk_width / self.chunk_widths_og
+        frame_scaled = cv2.addWeighted(0, 1.0 - scale, frame, scale, 0)
+
+        for chunk in range(num_chunks):
+
+            chunk_center = self.chunk_centers[chunk]
+
+            # get rid of values outside bounds of chunk
+            hue_mask = cv2.inRange(frame[:, :, 0],
+                                   self.chunk_range_mins[chunk],
+                                   self.chunk_range_maxs[chunk])
+            # hue_mask is now a mask for the location of values in a specific
+            # hue band;
+            hue = np.mod(frame_scaled[:, :, 0] + chunk_center -
+                         int(chunk_width / 2) + center_offset, 180)
+            hue = hue.astype('uint8')
+            hue = cv2.bitwise_and(hue, hue_mask)
+
+            # put into final hue array (bitwise or takes all nonzero vals)
+            hue_final = cv2.bitwise_or(hue_final, hue)
+
+        # return to bgr format
+        frame[:, :, 0] = hue_final
+        # frame[:, :, 1] = 255
+        # frame[:, :, 2] = 255
+        frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
 
         return frame
