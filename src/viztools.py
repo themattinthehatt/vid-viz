@@ -515,26 +515,69 @@ class Threshold(Effect):
     def __init__(self):
 
         # user option constants
-        self.MAX_NUM_THRESH_STYLES = 2
-        self.MAX_NUM_CHAN_STYLES = 4
+        THRESH_KERNEL = {
+            'DESC': 'kernel size for adaptive thresholding',
+            'NAME': 'kernel_size',
+            'VAL': 21,
+            'INIT': 21,
+            'MIN': 3,
+            'MAX': 71,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        THRESH_OFFSET = {
+            'DESC': 'offset constant for adaptive thresholding',
+            'NAME': 'offset',
+            'VAL': 4,
+            'INIT': 4,
+            'MIN': 0,
+            'MAX': 30,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            THRESH_KERNEL,
+            THRESH_OFFSET,
+            NONE,
+            NONE,
+            NONE,
+            NONE]
 
         # user options
-        self.style = 0                          # maps to THRESH_TYPE
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # other user options
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
+        self.MAX_NUM_CHAN_STYLES = 4
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
         self.ADAPTIVE_THRESH_TYPE = cv2.ADAPTIVE_THRESH_MEAN_C
-        self.THRESH_CEIL = 255
-        self.THRESH_BLOCK = 21
-        self.THRESH_C = 4
 
     def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
         if not key_lock:
+            self._process_io(key_list)
             if key_list[ord('b')]:
                 key_list[ord('b')] = False
                 self.use_chan[0] = True
@@ -550,15 +593,17 @@ class Threshold(Effect):
                 self.use_chan[0] = False
                 self.use_chan[1] = False
                 self.use_chan[2] = True
-            elif key_list[ord('t')]:
-                key_list[ord('t')] = False
-                self.style = (self.style + 1) % self.MAX_NUM_THRESH_STYLES
 
-        # process options
-        if self.style is 0:
-            self.THRESH_TYPE = cv2.THRESH_BINARY
-        elif self.style is 1:
-            self.THRESH_TYPE = cv2.THRESH_BINARY_INV
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        kernel_size = self.PROPS[0]['VAL']
+        offset = self.PROPS[1]['VAL']
 
         for chan in range(3):
             if self.use_chan[chan]:
@@ -572,11 +617,17 @@ class Threshold(Effect):
         frame_gray = cv2.medianBlur(frame_gray, 11)
         frame_thresh = cv2.adaptiveThreshold(
             frame_gray,
-            self.THRESH_CEIL,
+            255,
             self.ADAPTIVE_THRESH_TYPE,
             self.THRESH_TYPE,
-            self.THRESH_BLOCK,
-            self.THRESH_C)
+            kernel_size,
+            offset)
+
+        if self.style == 0:
+            self.THRESH_TYPE = cv2.THRESH_BINARY
+        elif self.style == 1:
+            self.THRESH_TYPE = cv2.THRESH_BINARY_INV
+
         for chan in range(3):
             if self.chan_style[chan] == 1:
                 frame[:, :, chan] = 0
@@ -1204,7 +1255,7 @@ class HueBloom(Effect):
             self.frame,
             (im_width, im_height),
             interpolation=cv2.INTER_CUBIC)
-        frame_back = 255.0 * frame_back
+        frame_back = 179.0 * frame_back
         frame_back = frame_back.astype('uint8')
         frame_back = cv2.cvtColor(frame_back, cv2.COLOR_HSV2BGR)
 
@@ -1381,7 +1432,7 @@ class HueSwirl(Effect):
                 self.frame_back_0,
                 (im_width, im_height),
                 interpolation=cv2.INTER_CUBIC)
-            self.frame_back = 255.0 * self.frame_back
+            self.frame_back = 179.0 * self.frame_back
             self.frame_back = self.frame_back.astype('uint8')
             self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
 
@@ -1605,7 +1656,7 @@ class HueSwirl2(Effect):
                 self.frame_back_0,
                 (im_width, im_height),
                 interpolation=cv2.INTER_CUBIC)
-            self.frame_back = 255.0 * self.frame_back
+            self.frame_back = 179.0 * self.frame_back
             self.frame_back = self.frame_back.astype('uint8')
             self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
 
