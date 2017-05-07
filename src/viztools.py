@@ -7,9 +7,6 @@ import numpy as np
 import utils as util
 
 """TODO
-- classes that need refactoring with list/list
-    threshold
-    alien
 - have each class call Effect (base class) constructor
 - add print statements
 """
@@ -503,12 +500,17 @@ class Threshold(Effect):
     Threshold individual channels in RGB frame
     
     KEYBOARD INPUTS:
+        t - toggle between threshold types
+        -/+ - decrease/increase adaptive threshold kernel size
+        [/] - decrease/increase adaptive threshold offset value
+        ;/' - None
+        ,/. - None
         r/g/b - select red/green/blue channel for further processing
         0 - selected channel uses original values
         1 - selected channel uses all pixels as 0
         2 - selected channel uses all pixels as 255
         3 - selected channel uses threshold effect
-        t - toggle between threshold styles
+        / - reset parameters
         q - quit threshold effect
     """
 
@@ -647,41 +649,83 @@ class Alien(Effect):
     Effect found in GIMP:Colors > Map > Alien Map
 
     KEYBOARD INPUTS:
+        -/+ - decrease/increase sine frequency
+        [/] - decrease/increase sine phase
+        ;/' - None
+        ,/. - None
         r/g/b - select red/green/blue channel for further processing
         0 - selected channel uses original values
         1 - selected channel uses all pixels as 0
         2 - selected channel uses all pixels as 255
         3 - selected channel uses alien effect
-        -/+ - decrease/increase frequency
-        DOWN/UP arrow - decrease/increase phase
-        / - reset frequency and phase values across all channels
+        / - reset parameters
         q - quit alien effect
     """
 
     def __init__(self):
 
         # user option constants
-        self.FREQ_MIN = 0
-        self.FREQ_MAX = 10
-        self.FREQ_INC = 0.05
-        self.PHASE_MIN = 0
-        self.PHASE_MAX = 2 * np.pi
-        self.PHASE_INC = np.pi / 10.0
-        self.MAX_NUM_CHAN_STYLES = 4
+        FREQ = {
+            'DESC': 'frequency of sine function',
+            'NAME': 'freq',
+            'VAL': 0.2,
+            'INIT': 0.2,
+            'MIN': 0.0,
+            'MAX': 10.0,
+            'STEP': 0.05,
+            'INC': False,
+            'DEC': False}
+        PHASE = {
+            'DESC': 'phase of sine function',
+            'NAME': 'phase',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 2 * np.pi,
+            'STEP': np.pi / 10.0,
+            'INC': False,
+            'DEC': False}
+        NONE = {
+            'NAME': '',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 1,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            FREQ,
+            PHASE,
+            NONE,
+            NONE,
+            NONE,
+            NONE]
 
         # user options
-        self.style = 0                          # maps to THRESH_TYPE
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(num_samples=10,
+                                      num_channels=self.chan_vec_pos.size)
+
+        # other user options
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
-        self.chan_freq = [0.2, 0.2, 0.2]        # current freq for each chan
-        self.chan_phase = [0, 0, 0]             # current phase for each chan
-
-        # key press parameters
-        self.INC0 = False
-        self.DEC0 = False
-        self.INC1 = False
-        self.DEC1 = False
+        self.chan_freq = [                      # current freq for each chan
+            self.PROPS[0]['VAL'],
+            self.PROPS[0]['VAL'],
+            self.PROPS[0]['VAL']]
+        self.chan_phase = [                     # current phase for each chan
+            self.PROPS[1]['VAL'],
+            self.PROPS[1]['VAL'],
+            self.PROPS[1]['VAL']]
+        self.MAX_NUM_CHAN_STYLES = 4
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -692,33 +736,23 @@ class Alien(Effect):
                 self.use_chan[0] = True
                 self.use_chan[1] = False
                 self.use_chan[2] = False
+                self.PROPS[0]['VAL'] = self.chan_freq[0]
+                self.PROPS[1]['VAL'] = self.chan_phase[0]
             elif key_list[ord('g')]:
                 key_list[ord('g')] = False
                 self.use_chan[0] = False
                 self.use_chan[1] = True
                 self.use_chan[2] = False
+                self.PROPS[0]['VAL'] = self.chan_freq[1]
+                self.PROPS[1]['VAL'] = self.chan_phase[1]
             elif key_list[ord('r')]:
                 key_list[ord('r')] = False
                 self.use_chan[0] = False
                 self.use_chan[1] = False
                 self.use_chan[2] = True
-            elif key_list[ord('/')]:
-                key_list[ord('/')] = False
-                # reset parameters
-                self.chan_freq = [0.2, 0.2, 0.2]
-                self.chan_phase = [0, 0, 0]
-            elif key_list[ord('-')]:
-                key_list[ord('-')] = False
-                self.DEC0 = True
-            elif key_list[ord('=')]:
-                key_list[ord('=')] = False
-                self.INC0 = True
-            elif key_list[ord('T')]:
-                key_list[ord('T')] = False
-                self.DEC1 = True
-            elif key_list[ord('R')]:
-                key_list[ord('R')] = False
-                self.INC1 = True
+                self.PROPS[0]['VAL'] = self.chan_freq[2]
+                self.PROPS[1]['VAL'] = self.chan_phase[2]
+            self._process_io(key_list)
 
         # process options
         for chan in range(3):
@@ -728,31 +762,25 @@ class Alien(Effect):
                     if key_list[ord(str(chan_style))]:
                         self.chan_style[chan] = chan_style
                         key_list[ord(str(chan_style))] = False
-                # update channel freq
-                if self.DEC0:
-                    self.DEC0 = False
-                    self.chan_freq[chan] -= self.FREQ_INC
-                if self.INC0:
-                    self.INC0 = False
-                    self.chan_freq[chan] += self.FREQ_INC
-                self.chan_freq[chan] = np.clip(self.chan_freq[chan],
-                                               self.FREQ_MIN,
-                                               self.FREQ_MAX)
-                # update channel phase
-                if self.DEC1:
-                    self.DEC1 = False
-                    self.chan_phase[chan] = (self.chan_phase[chan] -
-                                             self.PHASE_INC) % self.PHASE_MAX
-                if self.INC1:
-                    self.INC1 = False
-                    self.chan_phase[chan] = (self.chan_phase[chan] +
-                                             self.PHASE_INC) % self.PHASE_MAX
+                # update channel params
+                self.chan_freq[chan] = self.PROPS[0]['VAL']
+                self.chan_phase[chan] = self.PROPS[1]['VAL']
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for chan in range(3):
+                self.chan_freq[chan] = self.PROPS[0]['INIT']
+                self.chan_phase[chan] = self.PROPS[1]['INIT']
 
         # process image
         frame = cv2.GaussianBlur(frame, (11, 11), 0)
         frame_orig = frame
-        frame_orig.astype('float16')
-        frame.astype('float16')
+        frame_orig = frame_orig.astype('float16')
+        frame = frame.astype('float16')
 
         for chan in range(3):
             if self.chan_style[chan] == 0:
@@ -765,60 +793,8 @@ class Alien(Effect):
                 frame[:, :, chan] = 128 + 127 * np.cos(frame[:, :, chan] *
                                                        self.chan_freq[chan] +
                                                        self.chan_phase[chan])
-                # if THRESH:
-                #     frame[:, :, chan] = np.floor(frame[:, :, chan] / 255.0 *
-                #                                NUM_LEVELS) / NUM_LEVELS*255.0
 
-        frame.astype('uint8')
-
-        # if THRESH:
-        #     frame = cv2.medianBlur(frame, 9)
-        # else:
-        #     frame = cv2.GaussianBlur(frame, (9, 9), 0)
-        #
-        # # threshold to clean up effect
-        # if THRESH:
-        #     if THRESH_STYLE is 0:
-        #         THRESH_TYPE = cv2.THRESH_BINARY
-        #     elif THRESH_STYLE is 1:
-        #         THRESH_TYPE = cv2.THRESH_BINARY_INV
-        #
-        #     # MEAN_C | GAUSSIAN_C
-        #     ADAPTIVE_THRESH_TYPE = cv2.ADAPTIVE_THRESH_MEAN_C
-        #     THRESH_CEIL = 255
-        #     THRESH_BLOCK = 15
-        #     THRESH_C = 5
-        #
-        #     if ALIEN_R_CH_STYLE is 3:
-        #         frame[:, :, 2] = cv2.adaptiveThreshold(frame[:, :, 2],
-        #                                                THRESH_CEIL,
-        #                                                ADAPTIVE_THRESH_TYPE,
-        #                                                THRESH_TYPE,
-        #                                                THRESH_BLOCK, THRESH_C)
-        #     if ALIEN_G_CH_STYLE is 3:
-        #         frame[:, :, 1] = cv2.adaptiveThreshold(frame[:, :, 1],
-        #                                                THRESH_CEIL,
-        #                                                ADAPTIVE_THRESH_TYPE,
-        #                                                THRESH_TYPE,
-        #                                                THRESH_BLOCK, THRESH_C)
-        #     if ALIEN_B_CH_STYLE is 3:
-        #         frame[:, :, 0] = cv2.adaptiveThreshold(frame[:, :, 0],
-        #                                                THRESH_CEIL,
-        #                                                ADAPTIVE_THRESH_TYPE,
-        #                                                THRESH_TYPE,
-        #                                                THRESH_BLOCK, THRESH_C)
-        #     frame = cv2.medianBlur(frame, 11)
-        # else:
-        #     frame = cv2.GaussianBlur(frame, (9, 9), 0)
-        #
-        # frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # frame_gray = cv2.medianBlur(frame_gray, 11)
-        # frame_thresh = cv2.adaptiveThreshold(frame_gray,
-        #                                      self.THRESH_CEIL,
-        #                                      self.ADAPTIVE_THRESH_TYPE,
-        #                                      self.THRESH_TYPE,
-        #                                      self.THRESH_BLOCK,
-        #                                      self.THRESH_C)
+        frame = frame.astype('uint8')
 
         return frame
 
