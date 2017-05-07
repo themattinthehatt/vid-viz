@@ -7,13 +7,22 @@ import numpy as np
 import utils as util
 
 """TODO
-- have each class call Effect (base class) constructor
 - add print statements
 """
 
 
 class Effect(object):
     """Base class for vid-viz effects"""
+    def __init__(self):
+        # set attributes common to all effects
+        self.PROPS = None
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(
+            num_samples=1,
+            num_channels=self.chan_vec_pos.size)
 
     def _process_io(self, key_list):
 
@@ -82,6 +91,14 @@ class Effect(object):
     def process(self, frame, key_list):
         raise NotImplementedError
 
+    def reset(self):
+        for index, _ in enumerate(self.PROPS):
+            self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+        self.style = 0
+        self.reinitialize = False
+        self.chan_vec_pos = np.zeros(self.chan_vec_pos.shape)
+        self.noise.reinitialize()
+
 
 class Border(Effect):
     """
@@ -98,6 +115,8 @@ class Border(Effect):
     """
 
     def __init__(self):
+
+        super(Border, self).__init__()
 
         # user option constants
         MULT_FACTOR = {
@@ -170,8 +189,9 @@ class Border(Effect):
         self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -276,6 +296,8 @@ class PostProcess(Effect):
 
     def __init__(self):
 
+        super(PostProcess, self).__init__()
+
         GAUSSIAN_KERN = {
             'DESC': 'kernel size for gaussian smoothing',
             'NAME': 'gauss_kern',
@@ -322,8 +344,9 @@ class PostProcess(Effect):
         self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -375,6 +398,8 @@ class Mask(Effect):
     """
 
     def __init__(self):
+
+        super(Mask, self).__init__()
 
         # user option constants
         THRESH_KERN = {
@@ -433,8 +458,9 @@ class Mask(Effect):
         self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
     def process(self, frame_orig, key_list, key_lock=False):
 
@@ -516,6 +542,8 @@ class Threshold(Effect):
 
     def __init__(self):
 
+        super(Threshold, self).__init__()
+
         # user option constants
         THRESH_KERNEL = {
             'DESC': 'kernel size for adaptive thresholding',
@@ -562,8 +590,9 @@ class Threshold(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # other user options
         self.optimize = 1                       # skips a smoothing step
@@ -643,6 +672,11 @@ class Threshold(Effect):
 
         return frame
 
+    def reset(self):
+        super(Threshold, self).reset()
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]            # effect selector for each chan
+
 
 class Alien(Effect):
     """
@@ -663,6 +697,8 @@ class Alien(Effect):
     """
 
     def __init__(self):
+
+        super(Alien, self).__init__()
 
         # user option constants
         FREQ = {
@@ -710,21 +746,22 @@ class Alien(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # other user options
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
         self.chan_freq = [                      # current freq for each chan
-            self.PROPS[0]['VAL'],
-            self.PROPS[0]['VAL'],
-            self.PROPS[0]['VAL']]
+            self.PROPS[0]['INIT'],
+            self.PROPS[0]['INIT'],
+            self.PROPS[0]['INIT']]
         self.chan_phase = [                     # current phase for each chan
-            self.PROPS[1]['VAL'],
-            self.PROPS[1]['VAL'],
-            self.PROPS[1]['VAL']]
+            self.PROPS[1]['INIT'],
+            self.PROPS[1]['INIT'],
+            self.PROPS[1]['INIT']]
         self.MAX_NUM_CHAN_STYLES = 4
 
     def process(self, frame, key_list, key_lock=False):
@@ -798,6 +835,19 @@ class Alien(Effect):
 
         return frame
 
+    def reset(self):
+        super(Alien, self).reset()
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]  # effect selector for each chan
+        self.chan_freq = [  # current freq for each chan
+            self.PROPS[0]['INIT'],
+            self.PROPS[0]['INIT'],
+            self.PROPS[0]['INIT']]
+        self.chan_phase = [  # current phase for each chan
+            self.PROPS[1]['INIT'],
+            self.PROPS[1]['INIT'],
+            self.PROPS[1]['INIT']]
+
 
 class RGBWalk(Effect):
     """
@@ -816,6 +866,8 @@ class RGBWalk(Effect):
     """
 
     def __init__(self):
+
+        super(RGBWalk, self).__init__()
 
         # user option constants
         STEP_SIZE = {
@@ -854,8 +906,9 @@ class RGBWalk(Effect):
         self.reinitialize = False           # reset random walk
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -881,7 +934,7 @@ class RGBWalk(Effect):
         frame_gray = cv2.adaptiveThreshold(
             frame_gray, 255,
             cv2.ADAPTIVE_THRESH_MEAN_C,
-            cv2.THRESH_BINARY_INV, 15, 5)
+            cv2.THRESH_BINARY_INV, 21, 5)
         frame_gray = cv2.medianBlur(frame_gray, 7)
 
         # update noise values
@@ -931,6 +984,8 @@ class RGBBurst(Effect):
     """
 
     def __init__(self):
+
+        super(RGBBurst, self).__init__()
 
         # user option constants
         FRAME_INT = {
@@ -998,8 +1053,9 @@ class RGBBurst(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # background frame parameters
         self.frame_cnt = 0                              # frame counter
@@ -1121,6 +1177,11 @@ class RGBBurst(Effect):
 
         return frame_ret
 
+    def reset(self):
+        super(RGBBurst, self).reset()
+        self.frame_cnt = 0  # frame counter
+        self.frame = None   # background frame
+
 
 class HueBloom(Effect):
     """
@@ -1139,6 +1200,8 @@ class HueBloom(Effect):
 
     def __init__(self):
 
+        super(HueBloom, self).__init__()
+
         # user option constants
         DIM_SIZE = {
             'DESC': 'dimension of random matrix height/width',
@@ -1150,14 +1213,24 @@ class HueBloom(Effect):
             'STEP': 2,
             'INC': False,
             'DEC': False}
-        BACKGROUND_SCALE = {
-            'DESC': 'reduction parameter for bloom substrate',
-            'NAME': 'background_scale',
-            'VAL': 0.10,
-            'INIT': 0.10,
-            'MIN': 0.01,
-            'MAX': 1.0,
-            'STEP': 0.01,
+        BLUR_KERNEL = {
+            'DESC': 'size of background blur kernel',
+            'NAME': 'blur_kernel',
+            'VAL': 3,
+            'INIT': 3,
+            'MIN': 3,
+            'MAX': 51,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        PULSE_FREQ = {
+            'DESC': 'frequency of blur_kernal sine modulator',
+            'NAME': 'pulse_freq',
+            'VAL': 0.1,
+            'INIT': 0.1,
+            'MIN': 0.05,
+            'MAX': 5,
+            'STEP': 0.05,
             'INC': False,
             'DEC': False}
         NONE = {
@@ -1174,8 +1247,8 @@ class HueBloom(Effect):
         # combine dicts into a list for easy general access
         self.PROPS = [
             DIM_SIZE,
-            BACKGROUND_SCALE,
-            NONE,
+            BLUR_KERNEL,
+            PULSE_FREQ,
             NONE,
             NONE,
             NONE]
@@ -1185,13 +1258,17 @@ class HueBloom(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # frame parameters
-        self.prev_dim_size = DIM_SIZE['VAL']
-        self.frame = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
-        self.frame[:, :, 0] = np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+        self.frame_count = 0
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+        self.frame[:, :, 0] = np.random.rand(
+            self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -1208,11 +1285,18 @@ class HueBloom(Effect):
 
         # human-readable names
         dim_size = self.PROPS[0]['VAL']
-        # back_scale = self.PROPS[1]['VAL']
+        blur_kernel = self.PROPS[1]['VAL']
+        pulse_freq = self.PROPS[2]['VAL']
 
-        # change scale
-        int_val = np.floor(80.0 * self.noise.get_next_vals()) / 1000.0
-        back_scale = 0.15 + int_val
+        # update blur kernel size
+        val = 0.5 + 0.5 * np.sin(self.frame_count * pulse_freq)
+        self.frame_count += 1
+        blur_kernel = int(val * (self.PROPS[1]['MAX'] - self.PROPS[1]['MIN']) +
+                          self.PROPS[1]['MIN'])
+        # print(blur_kernel)
+        # make kernel odd-size
+        if blur_kernel % 2 == 0:
+            blur_kernel += 1
 
         # process image
         if len(frame.shape) == 3:
@@ -1237,7 +1321,7 @@ class HueBloom(Effect):
 
         # get mask
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frame_gray = cv2.medianBlur(frame_gray, 11)
+        frame_gray = cv2.medianBlur(frame_gray, 5)
         frame_mask = cv2.adaptiveThreshold(
             frame_gray,
             255,  # thresh ceil
@@ -1246,41 +1330,33 @@ class HueBloom(Effect):
             21,   # thresh block
             4     # thresh bias
         )
-        frame_mask2 = cv2.adaptiveThreshold(
-            frame_gray,
-            255,  # thresh ceil
-            cv2.ADAPTIVE_THRESH_MEAN_C,
-            cv2.THRESH_BINARY,
-            21,   # thresh block
-            4     # thresh bias
-        )
 
         # get blurred, masked background
-        frame_back2 = frame_back
         for chan in range(3):
-            frame_back2[:, :, chan] = cv2.bitwise_and(
+            frame_back[:, :, chan] = cv2.bitwise_and(
                 frame_back[:, :, chan],
                 frame_mask)
-        frame_back2 = cv2.resize(
-            frame_back2,
-            None,
-            fx=back_scale,
-            fy=back_scale,
-            interpolation=cv2.INTER_LINEAR)
-        frame_back2 = cv2.GaussianBlur(frame_back2, (5, 5), 0)
-        frame_back2 = cv2.resize(
-            frame_back2,
-            (im_width, im_height),
-            interpolation=cv2.INTER_LINEAR)
+        frame_back = cv2.GaussianBlur(
+            frame_back,
+            (blur_kernel, blur_kernel),
+            0)
 
         # remask blurred background
-        frame = frame_back2
         for chan in range(3):
             frame[:, :, chan] = cv2.bitwise_and(
-                frame_back2[:, :, chan],
-                frame_mask2)
+                frame_back[:, :, chan],
+                255 - frame_mask)
 
         return frame
+
+    def reset(self):
+        super(HueBloom, self).reset()
+        self.frame_count = 0
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+        self.frame[:, :, 0] = np.random.rand(
+            self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
 
 
 class HueSwirl(Effect):
@@ -1301,6 +1377,8 @@ class HueSwirl(Effect):
     """
 
     def __init__(self):
+
+        super(HueSwirl, self).__init__()
 
         # user option constants
         DIM_SIZE = {
@@ -1358,15 +1436,17 @@ class HueSwirl(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # frame parameters
-        self.prev_mask_blur = MASK_BLUR_KERNEL['VAL']
-        self.prev_dim_size = DIM_SIZE['VAL']
-        self.frame_back_0 = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
+        self.prev_mask_blur = self.PROPS[2]['INIT']
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
         self.frame_back_0[:, :, 0] = \
-            np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
         self.frame_back = None
         self.frame_mask = None
 
@@ -1455,6 +1535,17 @@ class HueSwirl(Effect):
 
         return frame
 
+    def reset(self):
+        super(HueSwirl, self).reset()
+        self.prev_mask_blur = self.PROPS[2]['INIT']
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+        self.frame_back_0[:, :, 0] = \
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+        self.frame_back = None
+        self.frame_mask = None
+
 
 class HueSwirl2(Effect):
     """
@@ -1479,6 +1570,8 @@ class HueSwirl2(Effect):
     """
 
     def __init__(self):
+
+        super(HueSwirl2, self).__init__()
 
         # user option constants
         DIM_SIZE = {
@@ -1546,17 +1639,19 @@ class HueSwirl2(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # frame parameters
         self.prev_mask_blur = 0  # to initialize frame_mask_list
-        self.prev_dim_size = DIM_SIZE['VAL']
-        self.frame_back_0 = np.ones((DIM_SIZE['VAL'], DIM_SIZE['VAL'], 3))
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
         self.frame_back_0[:, :, 0] = \
-            np.random.rand(DIM_SIZE['VAL'], DIM_SIZE['VAL'])
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
         self.frame_back = None
-        self.frame_mask_list = [None for _ in range(ITER_INDEX['MAX'] + 1)]
+        self.frame_mask_list = [None for _ in range(self.PROPS[4]['MAX'] + 1)]
         self.frame_mask = None
 
         # control parameters
@@ -1726,6 +1821,22 @@ class HueSwirl2(Effect):
 
         return frame
 
+    def reset(self):
+        super(HueSwirl2, self).reset()
+        # frame parameters
+        self.prev_mask_blur = 0  # to initialize frame_mask_list
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = np.ones(
+            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+        self.frame_back_0[:, :, 0] = \
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+        self.frame_back = None
+        self.frame_mask_list = [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+        self.frame_mask = None
+        # control parameters
+        self.increase_index = True
+        self.increase_meta_index = True
+
 
 class HueCrusher(Effect):
     """
@@ -1746,6 +1857,8 @@ class HueCrusher(Effect):
     """
 
     def __init__(self):
+
+        super(HueCrusher, self).__init__()
 
         # user option constants
         NUM_CHUNKS = {
@@ -1803,11 +1916,12 @@ class HueCrusher(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(num_samples=10,
-                                      num_channels=self.chan_vec_pos.size)
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
 
         # chunk params
-        num_chunks = NUM_CHUNKS['VAL']
+        num_chunks = self.PROPS[0]['INIT']
         self.num_chunks_prev = num_chunks
 
         self.chunk_widths_og = int(180 / num_chunks)
@@ -1899,3 +2013,21 @@ class HueCrusher(Effect):
         frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
 
         return frame
+
+    def reset(self):
+        super(HueCrusher, self).reset()
+        # chunk params
+        num_chunks = self.PROPS[0]['INIT']
+        self.num_chunks_prev = num_chunks
+        self.chunk_widths_og = int(180 / num_chunks)
+        self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+        for chunk in range(num_chunks):
+            self.chunk_range_mins[chunk] = \
+                chunk * self.chunk_widths_og
+            self.chunk_range_maxs[chunk] = \
+                (chunk + 1) * self.chunk_widths_og - 1
+            self.chunk_centers[chunk] = self.chunk_range_mins[chunk] + \
+                int(self.chunk_widths_og / 2)
+        self.chunk_range_maxs[-1] = 179
