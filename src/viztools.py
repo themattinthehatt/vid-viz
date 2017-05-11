@@ -10,6 +10,19 @@ import utils as util
 - add print statements
 """
 
+INF = 100000
+NONE = {
+    'DESC': '',
+    'NAME': '',
+    'VAL': 0,
+    'INIT': 0,
+    'MIN': 0,
+    'MAX': 1,
+    'MOD': INF,
+    'STEP': 1,
+    'INC': False,
+    'DEC': False}
+
 
 class Effect(object):
     """Base class for vid-viz effects"""
@@ -88,6 +101,9 @@ class Effect(object):
             if self.PROPS[index]['INC']:
                 self.PROPS[index]['INC'] = False
                 self.PROPS[index]['VAL'] += self.PROPS[index]['STEP']
+            self.PROPS[index]['VAL'] = np.mod(
+                self.PROPS[index]['VAL'],
+                self.PROPS[index]['MOD'])
             self.PROPS[index]['VAL'] = np.clip(
                 self.PROPS[index]['VAL'],
                 self.PROPS[index]['MIN'],
@@ -131,6 +147,7 @@ class Border(Effect):
             'INIT': 1.0,
             'MIN': 0.01,
             'MAX': 1.0,
+            'MOD': INF,
             'STEP': 0.05,
             'INC': False,
             'DEC': False}
@@ -140,6 +157,7 @@ class Border(Effect):
             'INIT': 1.0,
             'MIN': 1.0,
             'MAX': 10.0,
+            'MOD': INF,
             'STEP': 0.05,
             'INC': False,
             'DEC': False}
@@ -147,8 +165,9 @@ class Border(Effect):
             'NAME': 'rot_angle',
             'VAL': 0,
             'INIT': 0,
-            'MIN': -360,
-            'MAX': 360,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 360,
             'STEP': 5,
             'INC': False,
             'DEC': False}
@@ -158,6 +177,7 @@ class Border(Effect):
             'INIT': 0,
             'MIN': -500,
             'MAX': 500,
+            'MOD': INF,
             'STEP': 10,
             'INC': False,
             'DEC': False}
@@ -167,16 +187,8 @@ class Border(Effect):
             'INIT': 0,
             'MIN': -500,
             'MAX': 500,
+            'MOD': INF,
             'STEP': 10,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 3
@@ -311,6 +323,7 @@ class PostProcess(Effect):
             'INIT': 7,
             'MIN': 3,
             'MAX': 75,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -321,17 +334,8 @@ class PostProcess(Effect):
             'INIT': 7,
             'MIN': 3,
             'MAX': 75,
+            'MOD': INF,
             'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'DESC': '',
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 3
@@ -419,6 +423,7 @@ class Threshold(Effect):
             'INIT': 21,
             'MIN': 3,
             'MAX': 71,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -429,15 +434,7 @@ class Threshold(Effect):
             'INIT': 4,
             'MIN': 0,
             'MAX': 30,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
+            'MOD': INF,
             'STEP': 1,
             'INC': False,
             'DEC': False}
@@ -575,6 +572,7 @@ class Alien(Effect):
             'INIT': 0.2,
             'MIN': 0.0,
             'MAX': 10.0,
+            'MOD': INF,
             'STEP': 0.05,
             'INC': False,
             'DEC': False}
@@ -583,18 +581,10 @@ class Alien(Effect):
             'NAME': 'phase',
             'VAL': 0,
             'INIT': 0,
-            'MIN': 0,
-            'MAX': 2 * np.pi,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 2 * np.pi,
             'STEP': np.pi / 10.0,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 2
@@ -744,17 +734,8 @@ class RGBWalk(Effect):
             'INIT': 5.0,
             'MIN': 0.5,
             'MAX': 15.0,
+            'MOD': INF,
             'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'DESC': '',
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 2
@@ -862,6 +843,7 @@ class RGBBurst(Effect):
             'INIT': 10,
             'MIN': 1,
             'MAX': 100,
+            'MOD': INF,
             'STEP': 1,
             'INC': False,
             'DEC': False}
@@ -872,6 +854,7 @@ class RGBBurst(Effect):
             'INIT': 0.8,
             'MIN': 0.3,
             'MAX': 0.99,
+            'MOD': INF,
             'STEP': 0.01,
             'INC': False,
             'DEC': False}
@@ -882,6 +865,7 @@ class RGBBurst(Effect):
             'INIT': 1.1,
             'MIN': 1.01,
             'MAX': 2.0,
+            'MOD': INF,
             'STEP': 0.01,
             'INC': False,
             'DEC': False}
@@ -892,16 +876,8 @@ class RGBBurst(Effect):
             'INIT': 5.0,
             'MIN': 0.5,
             'MAX': 15.0,
+            'MOD': INF,
             'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 3
@@ -1077,6 +1053,7 @@ class HueBloom(Effect):
             'INIT': 10,
             'MIN': 2,
             'MAX': 100,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -1087,6 +1064,7 @@ class HueBloom(Effect):
             'INIT': 3,
             'MIN': 3,
             'MAX': 51,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -1097,16 +1075,8 @@ class HueBloom(Effect):
             'INIT': 0.1,
             'MIN': 0.05,
             'MAX': 5,
+            'MOD': INF,
             'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 3
@@ -1160,7 +1130,7 @@ class HueBloom(Effect):
         self.frame_count += 1
         blur_kernel = int(val * (self.PROPS[1]['MAX'] - self.PROPS[1]['MIN']) +
                           self.PROPS[1]['MIN'])
-        # print(blur_kernel)
+
         # make kernel odd-size
         if blur_kernel % 2 == 0:
             blur_kernel += 1
@@ -1240,6 +1210,7 @@ class HueSwirl(Effect):
     KEYBOARD INPUTS:
         t - toggle between effect types
         w - toggle random walk
+        a - toggle automatic behavior (vs keyboard input)
         -/+ - decrease/increase random matrix size
         [/] - decrease/increase bloom size
         ;/' - decrease/increase mask blur kernel
@@ -1262,6 +1233,7 @@ class HueSwirl(Effect):
             'INIT': 2,
             'MIN': 2,
             'MAX': 100,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -1272,6 +1244,7 @@ class HueSwirl(Effect):
             'INIT': 19,
             'MIN': 3,
             'MAX': 31,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -1282,6 +1255,7 @@ class HueSwirl(Effect):
             'INIT': 5,
             'MIN': 5,
             'MAX': 31,
+            'MOD': INF,
             'STEP': 2,
             'INC': False,
             'DEC': False}
@@ -1292,6 +1266,7 @@ class HueSwirl(Effect):
             'INIT': 0,
             'MIN': 0,
             'MAX': 75,
+            'MOD': INF,
             'STEP': 1,
             'INC': False,
             'DEC': False}
@@ -1300,8 +1275,9 @@ class HueSwirl(Effect):
             'NAME': 'mask_offset',
             'VAL': 255,
             'INIT': 255,
-            'MIN': 0,
-            'MAX': 255,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 255,
             'STEP': 5,
             'INC': False,
             'DEC': False}
@@ -1309,8 +1285,9 @@ class HueSwirl(Effect):
             'NAME': 'hue value offset for background frame',
             'VAL': 0,
             'INIT': 0,
-            'MIN': 0,
-            'MAX': 180,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 180,
             'STEP': 5,
             'INC': False,
             'DEC': False}
@@ -1575,6 +1552,7 @@ class HueCrusher(Effect):
             'INIT': 3,
             'MIN': 1,
             'MAX': 10,
+            'MOD': INF,
             'STEP': 1,
             'INC': False,
             'DEC': False}
@@ -1583,8 +1561,9 @@ class HueCrusher(Effect):
             'NAME': 'center_offset',
             'VAL': 0,
             'INIT': 0,
-            'MIN': -np.inf,
-            'MAX': np.inf,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 255,
             'STEP': 5,
             'INC': False,
             'DEC': False}
@@ -1595,16 +1574,8 @@ class HueCrusher(Effect):
             'INIT': 16,
             'MIN': 3,
             'MAX': 180,
+            'MOD': INF,
             'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 1
