@@ -16,6 +16,8 @@ class Effect(object):
     def __init__(self):
         # set attributes common to all effects
         self.PROPS = None
+        self.MAX_NUM_STYLES = 1
+        self.auto_play = False
         self.style = 0
         self.reinitialize = False
         self.random_walk = False
@@ -50,11 +52,11 @@ class Effect(object):
         elif key_list[ord('.')]:
             key_list[ord('.')] = False
             self.PROPS[3]['INC'] = True
-        elif key_list[ord('T')]:
-            key_list[ord('T')] = False
-            self.PROPS[4]['DEC'] = True
         elif key_list[ord('R')]:
             key_list[ord('R')] = False
+            self.PROPS[4]['DEC'] = True
+        elif key_list[ord('T')]:
+            key_list[ord('T')] = False
             self.PROPS[4]['INC'] = True
         elif key_list[ord('Q')]:
             key_list[ord('Q')] = False
@@ -69,6 +71,9 @@ class Effect(object):
             key_list[ord('t')] = False
             self.style = (self.style + 1) % self.MAX_NUM_STYLES
             # self.reinitialize = True
+        elif key_list[ord('a')]:
+            key_list[ord('a')] = False
+            self.auto_play = not self.auto_play
         elif key_list[ord('w')]:
             key_list[ord('w')] = False
             self.random_walk = not self.random_walk
@@ -95,6 +100,7 @@ class Effect(object):
         for index, _ in enumerate(self.PROPS):
             self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
         self.style = 0
+        self.auto_play = False
         self.reinitialize = False
         self.chan_vec_pos = np.zeros(self.chan_vec_pos.shape)
         self.noise.reinitialize()
@@ -378,145 +384,6 @@ class PostProcess(Effect):
             frame = cv2.bitwise_or(frame, frame_blurred)
         elif self.style == 2:
             frame = cv2.medianBlur(frame, median_kern)
-
-        return frame
-
-
-class Mask(Effect):
-    """
-    Manipulate mask on image
-
-    KEYBOARD INPUTS:
-        t - toggle between mask and inverse
-        w - toggle random walk
-        -/+ - decrease/increase adaptive threshold kernel size
-        [/] - decrease/increase median blur kernel size
-        ;/' - None
-        ,/. - decrease/increase random walk step size
-        / - reset parameters
-        backspace - quit mask effect
-    """
-
-    def __init__(self):
-
-        super(Mask, self).__init__()
-
-        # user option constants
-        THRESH_KERN = {
-            'DESC': 'kernel size for thresholding operation',
-            'NAME': 'thresh_kern',
-            'VAL': 15,
-            'INIT': 15,
-            'MIN': 3,
-            'MAX': 75,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        MEDIAN_KERN = {
-            'DESC': 'kernel size for median filtering after threshold',
-            'NAME': 'median_kern',
-            'VAL': 7,
-            'INIT': 7,
-            'MIN': 3,
-            'MAX': 75,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        STEP_SIZE = {
-            'DESC': 'step size that scales random walk',
-            'NAME': 'step_size',
-            'VAL': 5.0,
-            'INIT': 5.0,
-            'MIN': 0.5,
-            'MAX': 15.0,
-            'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'DESC': '',
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
-
-        # combine dicts into a list for easy general access
-        self.PROPS = [
-            THRESH_KERN,
-            MEDIAN_KERN,
-            NONE,
-            STEP_SIZE,
-            NONE,
-            NONE]
-
-        # user options
-        self.style = 0
-        self.reinitialize = False
-        self.random_walk = False
-        self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
-            num_samples=10,
-            num_channels=self.chan_vec_pos.size)
-
-    def process(self, frame_orig, key_list, key_lock=False):
-
-        frame = np.copy(frame_orig)
-
-        # process keyboard input
-        if not key_lock:
-            self._process_io(key_list)
-
-        if self.reinitialize:
-            self.reinitialize = False
-            self.chan_vec_pos = np.zeros((3, 2))
-            self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
-
-        # human-readable names
-        thresh_kern = self.PROPS[0]['VAL']
-        median_kern = self.PROPS[1]['VAL']
-        step_size = self.PROPS[3]['VAL']
-
-        # process image
-        if len(frame.shape) == 3:
-            [im_height, im_width, _] = frame.shape
-        elif len(frame.shape) == 2:
-            [im_height, im_width] = frame.shape
-
-        # random walk
-        if self.random_walk:
-            frame = cv2.warpAffine(
-                frame,
-                np.float32([[1, 0, self.chan_vec_pos[0, 0]],
-                            [0, 1, self.chan_vec_pos[0, 1]]]),
-                (im_width, im_height))
-            # update noise values
-            self.chan_vec_pos += np.reshape(
-                step_size * self.noise.get_next_vals(), (3, 2))
-
-        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if self.style == 0:
-            frame = cv2.adaptiveThreshold(
-                frame_gray,
-                255,
-                cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY_INV,
-                thresh_kern,
-                5)
-        elif self.style == 1:
-            frame = cv2.adaptiveThreshold(
-                frame_gray,
-                255,
-                cv2.ADAPTIVE_THRESH_MEAN_C,
-                cv2.THRESH_BINARY,
-                thresh_kern,
-                5)
-        frame = cv2.medianBlur(frame, median_kern)
 
         return frame
 
@@ -1362,8 +1229,13 @@ class HueBloom(Effect):
 class HueSwirl(Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
-    with iteratively applying blur kernels; HueSwirl2 performs same operation 
-    but has more automated behavior
+    with iteratively applying blur kernels. Iterative blur occurs 
+    automatically until reaching a stopping point defined in ITER_INDEX dict,
+    then reverses until no blur occurs. Then an automatic change in the mask 
+    blur kernel size occurs, and the iterative blur kernel operation continues
+    again. Once the entire loop has gone back and forth in blur kernel size 
+    space the blur type is switched from median to Gaussian or vice-versa.
+    Note: This effect is a bit messy now, needs cleaning up
 
     KEYBOARD INPUTS:
         t - toggle between effect types
@@ -1371,7 +1243,9 @@ class HueSwirl(Effect):
         -/+ - decrease/increase random matrix size
         [/] - decrease/increase bloom size
         ;/' - decrease/increase mask blur kernel
-        ,/. - None
+        ,/. - decrease/increase final masking offset value
+        ud arrows - walk through blur iterations
+        lr arrows - decrease/increase offset in background huespace
         / - reset parameters
         q - quit hueswirl effect
     """
@@ -1406,200 +1280,7 @@ class HueSwirl(Effect):
             'NAME': 'mask_blur',
             'VAL': 5,
             'INIT': 5,
-            'MIN': 1,
-            'MAX': 31,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        NONE = {
-            'NAME': '',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
-
-        # combine dicts into a list for easy general access
-        self.PROPS = [
-            DIM_SIZE,
-            BACKGROUND_BLUR_KERNEL,
-            MASK_BLUR_KERNEL,
-            NONE,
-            NONE,
-            NONE]
-
-        # user options
-        self.style = 0
-        self.reinitialize = False
-        self.random_walk = True
-        self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
-            num_samples=10,
-            num_channels=self.chan_vec_pos.size)
-
-        # frame parameters
-        self.prev_mask_blur = self.PROPS[2]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
-        self.frame_back_0 = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
-        self.frame_back_0[:, :, 0] = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
-        self.frame_back = None
-        self.frame_mask = None
-
-    def process(self, frame, key_list, key_lock=False):
-
-        # process keyboard input
-        if not key_lock:
-            self._process_io(key_list)
-
-        if self.reinitialize:
-            self.reinitialize = False
-            self.chan_vec_pos = np.zeros((1, 1))
-            self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
-
-        # human-readable names
-        dim_size = self.PROPS[0]['VAL']
-        back_blur = self.PROPS[1]['VAL']
-        mask_blur = self.PROPS[2]['VAL']
-
-        # process image
-        if len(frame.shape) == 3:
-            [im_height, im_width, _] = frame.shape
-        elif len(frame.shape) == 2:
-            [im_height, im_width] = frame.shape
-
-        # create new random matrix if necessary
-        if int(dim_size) is not int(self.prev_dim_size):
-            self.prev_dim_size = dim_size
-            self.frame_back_0 = np.ones((dim_size, dim_size, 3))
-            self.frame_back_0[:, :, 0] = np.random.rand(dim_size, dim_size)
-            self.frame_back = None
-
-        # create background frame if necessary
-        if self.frame_back is None:
-            # get resized background
-            self.frame_back = cv2.resize(
-                self.frame_back_0,
-                (im_width, im_height),
-                interpolation=cv2.INTER_CUBIC)
-            self.frame_back = 179.0 * self.frame_back
-            self.frame_back = self.frame_back.astype('uint8')
-            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
-
-        # get mask if necessary
-        if self.frame_mask is None or \
-                int(mask_blur) is not int(self.prev_mask_blur):
-            self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # frame_gray = cv2.medianBlur(frame_gray, 11)
-            # self.frame_mask = cv2.adaptiveThreshold(
-            #     frame_gray,
-            #     255,  # thresh ceil
-            #     cv2.ADAPTIVE_THRESH_MEAN_C,
-            #     cv2.THRESH_BINARY_INV,
-            #     21,  # thresh block
-            #     4)  # thresh bias
-            self.prev_mask_blur = mask_blur
-
-        if self.style == 0:
-            self.frame_mask = cv2.medianBlur(self.frame_mask, mask_blur)
-        elif self.style == 1:
-            self.frame_mask = cv2.GaussianBlur(
-                self.frame_mask,
-                (mask_blur, mask_blur),
-                0)
-
-        # get masked then blurred background
-        frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
-        for chan in range(3):
-            frame_back_blurred[:, :, chan] = cv2.bitwise_and(
-                self.frame_back[:, :, chan],
-                self.frame_mask)
-        frame_back_blurred = cv2.GaussianBlur(
-            frame_back_blurred,
-            (back_blur, back_blur),
-            0)
-
-        # remask blurred background
-        frame = np.zeros(self.frame_back.shape, dtype='uint8')
-        for chan in range(3):
-            frame[:, :, chan] = cv2.bitwise_and(
-                frame_back_blurred[:, :, chan],
-                255 - self.frame_mask)
-
-        return frame
-
-    def reset(self):
-        super(HueSwirl, self).reset()
-        self.prev_mask_blur = self.PROPS[2]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
-        self.frame_back_0 = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
-        self.frame_back_0[:, :, 0] = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
-        self.frame_back = None
-        self.frame_mask = None
-
-
-class HueSwirl2(Effect):
-    """
-    Create bloom effect around thresholded version of input frame then melt it
-    with iteratively applying blur kernels. Iterative blur occurs 
-    automatically until reaching a stopping point defined in ITER_INDEX dict,
-    then reverses until no blur occurs. Then an automatic change in the mask 
-    blur kernel size occurs, and the iterative blur kernel operation continues
-    again. Once the entire loop has gone back and forth in blur kernel size 
-    space the blur type is switched from median to Gaussian or vice-versa.
-
-    KEYBOARD INPUTS:
-        t - toggle between effect types
-        w - toggle random walk
-        -/+ - decrease/increase random matrix size
-        [/] - decrease/increase bloom size
-        ;/' - decrease/increase mask blur kernel
-        ,/. - None
-        ud arrows - walk through blur iterations
-        / - reset parameters
-        q - quit hueswirl effect
-    """
-
-    def __init__(self):
-
-        super(HueSwirl2, self).__init__()
-
-        # user option constants
-        DIM_SIZE = {
-            'DESC': 'dimension of background random matrix height/width',
-            'NAME': 'dim_size',
-            'VAL': 2,
-            'INIT': 2,
-            'MIN': 2,
-            'MAX': 100,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        BACKGROUND_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gaussian blur that produces bloom',
-            'NAME': 'back_blur',
-            'VAL': 19,
-            'INIT': 19,
-            'MIN': 3,
-            'MAX': 31,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        MASK_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gauss/med blur that acts on mask',
-            'NAME': 'mask_blur',
-            'VAL': 5,
-            'INIT': 5,
-            'MIN': 3,
+            'MIN': 5,
             'MAX': 31,
             'STEP': 2,
             'INC': False,
@@ -1614,13 +1295,23 @@ class HueSwirl2(Effect):
             'STEP': 1,
             'INC': False,
             'DEC': False}
-        NONE = {
-            'NAME': '',
+        FINAL_MASK_OFFSET = {
+            'DESC': 'mask is subtracted from this value before final masking',
+            'NAME': 'mask_offset',
+            'VAL': 255,
+            'INIT': 255,
+            'MIN': 0,
+            'MAX': 255,
+            'STEP': 5,
+            'INC': False,
+            'DEC': False}
+        HUE_OFFSET = {
+            'NAME': 'hue value offset for background frame',
             'VAL': 0,
             'INIT': 0,
             'MIN': 0,
-            'MAX': 1,
-            'STEP': 1,
+            'MAX': 180,
+            'STEP': 5,
             'INC': False,
             'DEC': False}
         self.MAX_NUM_STYLES = 2
@@ -1630,12 +1321,13 @@ class HueSwirl2(Effect):
             DIM_SIZE,
             BACKGROUND_BLUR_KERNEL,
             MASK_BLUR_KERNEL,
-            NONE,
+            FINAL_MASK_OFFSET,
             ITER_INDEX,
-            NONE]
+            HUE_OFFSET]
 
         # user options
         self.style = 0
+        self.auto_play = True
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
@@ -1645,6 +1337,7 @@ class HueSwirl2(Effect):
 
         # frame parameters
         self.prev_mask_blur = 0  # to initialize frame_mask_list
+        self.prev_hue_offset = self.PROPS[5]['INIT']
         self.prev_dim_size = self.PROPS[0]['INIT']
         self.frame_back_0 = np.ones(
             (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
@@ -1682,30 +1375,33 @@ class HueSwirl2(Effect):
             self.increase_meta_index = True
 
         # control parameters
-        if self.increase_index:
-            self.PROPS[4]['VAL'] += 1
-        else:
-            self.PROPS[4]['VAL'] -= 1
-        if self.PROPS[4]['VAL'] == self.PROPS[4]['MAX']:
-            self.increase_index = False
-        if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
-            self.increase_index = True
-            # change meta index
-            if self.increase_meta_index:
-                self.PROPS[2]['VAL'] += self.PROPS[2]['STEP']
+        if self.auto_play:
+            if self.increase_index:
+                self.PROPS[4]['VAL'] += 1
             else:
-                self.PROPS[2]['VAL'] -= self.PROPS[2]['STEP']
-            if self.PROPS[2]['VAL'] == self.PROPS[2]['MAX']:
-                self.increase_meta_index = False
-            if self.PROPS[2]['VAL'] == self.PROPS[2]['MIN']:
-                self.increase_meta_index = True
-                self.style = (self.style + 1) % self.MAX_NUM_STYLES
+                self.PROPS[4]['VAL'] -= 1
+            if self.PROPS[4]['VAL'] == self.PROPS[4]['MAX']:
+                self.increase_index = False
+            if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
+                self.increase_index = True
+                # change meta index
+                if self.increase_meta_index:
+                    self.PROPS[2]['VAL'] += self.PROPS[2]['STEP']
+                else:
+                    self.PROPS[2]['VAL'] -= self.PROPS[2]['STEP']
+                if self.PROPS[2]['VAL'] == self.PROPS[2]['MAX']:
+                    self.increase_meta_index = False
+                if self.PROPS[2]['VAL'] == self.PROPS[2]['MIN']:
+                    self.increase_meta_index = True
+                    self.style = (self.style + 1) % self.MAX_NUM_STYLES
 
         # human-readable names
         dim_size = self.PROPS[0]['VAL']
         back_blur = self.PROPS[1]['VAL']
         mask_blur = self.PROPS[2]['VAL']
+        final_offset = self.PROPS[3]['VAL']
         iter_index = self.PROPS[4]['VAL']
+        hue_offset = self.PROPS[5]['VAL']
 
         # process image
         if len(frame.shape) == 3:
@@ -1730,6 +1426,16 @@ class HueSwirl2(Effect):
             self.frame_back = 179.0 * self.frame_back
             self.frame_back = self.frame_back.astype('uint8')
             self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
+
+        # update background frame if necessary
+        if int(hue_offset) is not int(self.prev_hue_offset):
+            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_BGR2HSV)
+            # uint8s don't play nice with subtraction
+            self.frame_back[:, :, 0] += abs(
+                int(hue_offset - self.prev_hue_offset))
+            self.frame_back[:, :, 0] = np.mod(self.frame_back[:, :, 0], 180)
+            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
+            self.prev_hue_offset = hue_offset
 
         # get mask if necessary
         if int(mask_blur) is not int(self.prev_mask_blur) or reset_iter_seq:
@@ -1817,12 +1523,13 @@ class HueSwirl2(Effect):
         for chan in range(3):
             frame[:, :, chan] = cv2.bitwise_and(
                 frame_back_blurred[:, :, chan],
-                255 - self.frame_mask)
+                final_offset - self.frame_mask)
 
         return frame
 
     def reset(self):
-        super(HueSwirl2, self).reset()
+        super(HueSwirl, self).reset()
+        self.auto_play = True
         # frame parameters
         self.prev_mask_blur = 0  # to initialize frame_mask_list
         self.prev_dim_size = self.PROPS[0]['INIT']

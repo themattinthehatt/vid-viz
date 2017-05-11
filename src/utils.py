@@ -50,6 +50,8 @@ def resize(frame, frame_width, frame_height, interpolation=cv2.INTER_LINEAR):
         frame (numpy array) - frame to be resized
         frame_width (int) - desired frame width
         frame_height (int) - desired frame height
+        interpolation (OpenCV option)
+            cv2.INTER_LINEAR | cv2.INTER_CUBIC
         
     RETURNS:
         frame (numpy array) - updated frame
