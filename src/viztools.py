@@ -1321,7 +1321,8 @@ class HueSwirl(Effect):
         self.frame_back_0[:, :, 0] = \
             np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
         self.frame_back = None
-        self.frame_mask_list = [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+        self.frame_mask_list = [None for _ in
+                                range(self.PROPS[4]['MAX'] + 1)]
         self.frame_mask = None
 
         # control parameters
@@ -1400,22 +1401,28 @@ class HueSwirl(Effect):
                 self.frame_back_0,
                 (im_width, im_height),
                 interpolation=cv2.INTER_CUBIC)
-            self.frame_back = 179.0 * self.frame_back
+            self.frame_back[:, :, 0] = 179.0 * self.frame_back[:, :, 0]
+            self.frame_back[:, :, 1:3] = 255.0 * self.frame_back[:, :, 1:3]
             self.frame_back = self.frame_back.astype('uint8')
-            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
+            self.frame_back = cv2.cvtColor(self.frame_back,
+                                           cv2.COLOR_HSV2BGR)
 
         # update background frame if necessary
         if int(hue_offset) is not int(self.prev_hue_offset):
-            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_BGR2HSV)
+            self.frame_back = cv2.cvtColor(self.frame_back,
+                                           cv2.COLOR_BGR2HSV)
             # uint8s don't play nice with subtraction
             self.frame_back[:, :, 0] += abs(
                 int(hue_offset - self.prev_hue_offset))
-            self.frame_back[:, :, 0] = np.mod(self.frame_back[:, :, 0], 180)
-            self.frame_back = cv2.cvtColor(self.frame_back, cv2.COLOR_HSV2BGR)
+            self.frame_back[:, :, 0] = np.mod(self.frame_back[:, :, 0],
+                                              180)
+            self.frame_back = cv2.cvtColor(self.frame_back,
+                                           cv2.COLOR_HSV2BGR)
             self.prev_hue_offset = hue_offset
 
         # get mask if necessary
-        if int(mask_blur) is not int(self.prev_mask_blur) or reset_iter_seq:
+        if int(mask_blur) is not int(
+                self.prev_mask_blur) or reset_iter_seq:
             # blur kernel changed; restart iteration sequence
             self.PROPS[4]['VAL'] = self.PROPS[4]['INIT']
             iter_index = self.PROPS[4]['VAL']
@@ -1424,16 +1431,6 @@ class HueSwirl(Effect):
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
             # get new mask
             self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # frame_gray = cv2.medianBlur(
-            #     cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
-            #     11)
-            # self.frame_mask = cv2.adaptiveThreshold(
-            #     frame_gray,
-            #     255,  # thresh ceil
-            #     cv2.ADAPTIVE_THRESH_MEAN_C,
-            #     cv2.THRESH_BINARY_INV,
-            #     21,  # thresh block
-            #     4)  # thresh bias
             if self.style == 0:
                 self.frame_mask = cv2.medianBlur(
                     self.frame_mask,
@@ -1520,6 +1517,280 @@ class HueSwirl(Effect):
         # control parameters
         self.increase_index = True
         self.increase_meta_index = True
+
+
+class HueSwirlMover(Effect):
+    """
+    Performs same processing steps as HueSwirl, but adds in a fading background 
+    so that video can be used as input
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk
+        a - toggle automatic behavior (vs keyboard input)
+        -/+ - decrease/increase random matrix size
+        [/] - decrease/increase bloom size
+        ;/' - decrease/increase mask blur kernel
+        ,/. - decrease/increase final masking offset value
+        ud arrows - walk through blur iterations
+        lr arrows - decrease/increase offset in background huespace
+        / - reset parameters
+        q - quit hueswirl effect
+    """
+
+    def __init__(self):
+
+        super(HueSwirlMover, self).__init__()
+
+        # user option constants
+        DIM_SIZE = {
+            'DESC': 'dimension of background random matrix height/width',
+            'NAME': 'dim_size',
+            'VAL': 2,
+            'INIT': 2,
+            'MIN': 2,
+            'MAX': 100,
+            'MOD': INF,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        BACKGROUND_BLUR_KERNEL = {
+            'DESC': 'kernel size for Gaussian blur that produces bloom',
+            'NAME': 'back_blur',
+            'VAL': 19,
+            'INIT': 19,
+            'MIN': 3,
+            'MAX': 31,
+            'MOD': INF,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        MASK_BLUR_KERNEL = {
+            'DESC': 'kernel size for Gauss/med blur that acts on mask',
+            'NAME': 'mask_blur',
+            'VAL': 5,
+            'INIT': 5,
+            'MIN': 5,
+            'MAX': 31,
+            'MOD': INF,
+            'STEP': 2,
+            'INC': False,
+            'DEC': False}
+        ITER_INDEX = {
+            'DESC': 'index into blurring iterations',
+            'NAME': 'iter_index',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': 0,
+            'MAX': 75,
+            'MOD': INF,
+            'STEP': 1,
+            'INC': False,
+            'DEC': False}
+        BLEND_PROP = {
+            'DESC': 'modulates weighting between new and previous frame',
+            'NAME': 'blend_prop',
+            'VAL': 0.5,
+            'INIT': 0.5,
+            'MIN': 0.05,
+            'MAX': 1.0,
+            'MOD': INF,
+            'STEP': 0.05,
+            'INC': False,
+            'DEC': False}
+        HUE_OFFSET = {
+            'NAME': 'hue value offset for background frame',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 180,
+            'STEP': 5,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
+
+        # combine dicts into a list for easy general access
+        self.PROPS = [
+            DIM_SIZE,
+            BACKGROUND_BLUR_KERNEL,
+            MASK_BLUR_KERNEL,
+            BLEND_PROP,
+            ITER_INDEX,
+            HUE_OFFSET]
+
+        # user options
+        self.style = 0
+        self.auto_play = False
+        self.reinitialize = False
+        self.random_walk = True
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
+
+        # frame parameters
+        self.prev_hue_offset = self.PROPS[5]['INIT']
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = \
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+        self.frame_back = None
+        self.frame_mask_blurred = None
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((1, 1))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.PROPS):
+                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+
+        # human-readable names
+        dim_size = self.PROPS[0]['VAL']
+        back_blur = self.PROPS[1]['VAL']
+        mask_blur = self.PROPS[2]['VAL']
+        blend_prop = self.PROPS[3]['VAL']
+        hue_offset = self.PROPS[5]['VAL']
+
+        # process image
+        if len(frame.shape) == 3:
+            [im_height, im_width, _] = frame.shape
+        elif len(frame.shape) == 2:
+            [im_height, im_width] = frame.shape
+
+        # create new random matrix if necessary
+        if int(dim_size) is not int(self.prev_dim_size):
+            self.prev_dim_size = dim_size
+            self.frame_back_0 = np.random.rand(dim_size, dim_size)
+            self.frame_back = None
+
+        # create background frame if necessary
+        if self.frame_back is None:
+            # get resized background
+            self.frame_back = cv2.resize(
+                self.frame_back_0,
+                (im_width, im_height),
+                interpolation=cv2.INTER_CUBIC)
+            self.frame_back = 179.0 * self.frame_back
+            self.frame_back = self.frame_back.astype('uint8')
+
+        # update background frame if necessary
+        if int(hue_offset) is not int(self.prev_hue_offset):
+            # uint8s don't play nice with subtraction
+            self.frame_back += abs(
+                int(hue_offset - self.prev_hue_offset))
+            self.frame_back = np.mod(self.frame_back, 180)
+            self.frame_back = self.frame_back.astype('uint8')
+            self.prev_hue_offset = hue_offset
+
+        if self.style == 0:
+
+            # get mask
+            frame_mask = cv2.adaptiveThreshold(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+                255,  # thresh ceil
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY_INV,
+                21,  # thresh block
+                4)  # thresh bias
+            # reduce noise in mask
+            frame_mask = cv2.medianBlur(frame_mask, 9)
+            # blur mask
+            if self.style == 0:
+                frame_mask = cv2.medianBlur(
+                    frame_mask,
+                    mask_blur)
+            elif self.style == 1:
+                frame_mask = cv2.GaussianBlur(
+                    frame_mask,
+                    (mask_blur, mask_blur),
+                    0)
+            # add to previous masks
+            if self.frame_mask_blurred is not None:
+                self.frame_mask_blurred = cv2.addWeighted(
+                    frame_mask,
+                    blend_prop,
+                    self.frame_mask_blurred,
+                    1.0 - blend_prop,
+                    0)
+            else:
+                self.frame_mask_blurred = frame_mask
+            # make new mask stand out since it was weighted w/ previous mask
+            frame_mask = cv2.bitwise_or(
+                self.frame_mask_blurred,
+                frame_mask)
+
+            # mask background
+            frame[:, :, 0] = self.frame_back
+            frame[:, :, 1] = 255
+            frame[:, :, 2] = frame_mask
+            frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
+
+        elif self.style == 1:
+
+            # get mask
+            frame_mask = cv2.adaptiveThreshold(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY),
+                255,  # thresh ceil
+                cv2.ADAPTIVE_THRESH_MEAN_C,
+                cv2.THRESH_BINARY,
+                21,  # thresh block
+                4)  # thresh bias
+            frame_mask = cv2.medianBlur(frame_mask, 9)  # noise reduction
+            if self.style == 0:
+                frame_mask = cv2.medianBlur(
+                    frame_mask,
+                    mask_blur)
+            elif self.style == 1:
+                frame_mask = cv2.GaussianBlur(
+                    frame_mask,
+                    (mask_blur, mask_blur),
+                    0)
+            if self.frame_mask_blurred is not None:
+                self.frame_mask_blurred = cv2.addWeighted(
+                    frame_mask,
+                    blend_prop,
+                    self.frame_mask_blurred,
+                    1.0 - blend_prop,
+                    0)
+            else:
+                self.frame_mask_blurred = frame_mask
+
+            # get masked then blurred background
+            frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
+            for chan in range(3):
+                frame_back_blurred[:, :, chan] = cv2.bitwise_and(
+                    self.frame_back[:, :, chan],
+                    frame_mask)
+            frame_back_blurred = cv2.GaussianBlur(
+                frame_back_blurred,
+                (back_blur, back_blur),
+                0)
+
+            # remask blurred background
+            frame = np.zeros(self.frame_back.shape, dtype='uint8')
+            for chan in range(3):
+                frame[:, :, chan] = cv2.bitwise_and(
+                    frame_back_blurred[:, :, chan],
+                    255 - self.frame_mask_blurred)
+
+        return frame
+
+    def reset(self):
+        super(HueSwirlMover, self).reset()
+        self.auto_play = False
+        # frame parameters
+        self.prev_hue_offset = self.PROPS[5]['INIT']
+        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.frame_back_0 = \
+            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+        self.frame_back = None
+        self.frame_mask_blurred = None
 
 
 class HueCrusher(Effect):
