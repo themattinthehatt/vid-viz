@@ -1,3 +1,8 @@
+"""
+This file contains a library of simple image processing effects that can be 
+applied to source images or video
+"""
+
 from __future__ import print_function
 from __future__ import division
 
