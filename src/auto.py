@@ -38,6 +38,7 @@ class HueSwirlChain(vv.Effect):
     KEYBOARD INPUTS:
         t - toggle between effect types
         w - toggle random walk
+        a - toggle automatic behavior (vs keyboard input)
         -/+ - decrease/increase random matrix size
         [/] - decrease/increase bloom size
         ;/' - decrease/increase mask blur kernel
@@ -55,12 +56,12 @@ class HueSwirlChain(vv.Effect):
         DIM_SIZE = {
             'DESC': 'dimension of background random matrix height/width',
             'NAME': 'dim_size',
-            'VAL': 2,
-            'INIT': 2,
-            'MIN': 2,
+            'VAL': 1,
+            'INIT': 1,
+            'MIN': 1,
             'MAX': 100,
             'MOD': INF,
-            'STEP': 2,
+            'STEP': 1,
             'INC': False,
             'DEC': False}
         BACKGROUND_BLUR_KERNEL = {
@@ -96,17 +97,6 @@ class HueSwirlChain(vv.Effect):
             'STEP': 1,
             'INC': False,
             'DEC': False}
-        ITER_INDEX = {
-            'DESC': 'index into blurring iterations',
-            'NAME': 'iter_index',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
         FINAL_MASK_OFFSET = {
             'DESC': 'mask is subtracted from this value before final masking',
             'NAME': 'mask_offset',
@@ -114,11 +104,21 @@ class HueSwirlChain(vv.Effect):
             'INIT': 255,
             'MIN': -INF,
             'MAX': INF,
-            'MOD': 255,
+            'MOD': 256,
             'STEP': 5,
             'INC': False,
             'DEC': False}
-        self.MAX_NUM_STYLES = 1
+        HUE_OFFSET = {
+            'NAME': 'hue value offset for background frame',
+            'VAL': 0,
+            'INIT': 0,
+            'MIN': -INF,
+            'MAX': INF,
+            'MOD': 180,
+            'STEP': 5,
+            'INC': False,
+            'DEC': False}
+        self.MAX_NUM_STYLES = 2
 
         # combine dicts into a list for easy general access
         self.PROPS = [
@@ -127,10 +127,11 @@ class HueSwirlChain(vv.Effect):
             MASK_BLUR_KERNEL,
             FINAL_MASK_OFFSET,
             ITER_INDEX,
-            ITER_INDEX]
+            HUE_OFFSET]
 
         # user options
         self.style = 0
+        self.auto_play = True
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
@@ -168,10 +169,10 @@ class HueSwirlChain(vv.Effect):
         # frame parameters
         self.curr_frame_index = 0
         self.file_index = 0
-        frame_0 = cv2.imread(self.file_list[self.file_indx])
+        frame_0 = cv2.imread(self.file_list[self.file_index])
         frame_0 = util.resize(frame_0, self.frame_width, self.frame_height)
         self.file_index += 1
-        frame_1 = cv2.imread(self.file_list[self.file_indx])
+        frame_1 = cv2.imread(self.file_list[self.file_index])
         frame_1 = util.resize(frame_1, self.frame_width, self.frame_height)
         self.file_index += 1
         self.frame = [frame_0, frame_1]
@@ -196,6 +197,11 @@ class HueSwirlChain(vv.Effect):
         #     reset_iter_seq = True
         # else:
         #     reset_iter_seq = False
+
+        # control parameters (use _process_io for clipping and modding)
+        if self.auto_play:
+            self.PROPS[3]['VAL'] += 1  # final mask offset
+            self.PROPS[5]['VAL'] += 0.1  # hue offset
 
         # process keyboard input
         if not key_lock:
@@ -239,6 +245,8 @@ class HueSwirlChain(vv.Effect):
         if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
             self.increase_blur_index = True
             reset_iter_seq = True
+        else:
+            reset_iter_seq = False
 
         # control parameters - source
         if reset_iter_seq:
@@ -247,7 +255,7 @@ class HueSwirlChain(vv.Effect):
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
             # load new image
             self.frame[self.curr_frame_index] = \
-                cv2.imread(self.file_list[self.file_indx])
+                cv2.imread(self.file_list[self.file_index])
             self.frame[self.curr_frame_index] = util.resize(
                 self.frame[self.curr_frame_index],
                 self.frame_width,
@@ -272,7 +280,7 @@ class HueSwirlChain(vv.Effect):
         if int(dim_size) is not int(self.prev_dim_size):
             self.prev_dim_size = dim_size
             self.frame_back_0 = np.ones((dim_size, dim_size, 3))
-            self.frame_back_0[:, :, 0] = np.random.rand(dim_size, dim_size)
+            self.frame_back_0[:, :, 2] = np.random.rand(dim_size, dim_size)
             self.frame_back = None
 
         # create background frame if necessary
@@ -281,7 +289,7 @@ class HueSwirlChain(vv.Effect):
             self.frame_back = cv2.resize(
                 self.frame_back_0,
                 (self.frame_width, self.frame_height),
-                interpolation=cv2.INTER_CUBIC)
+                interpolation=cv2.INTER_LINEAR)
             self.frame_back[:, :, 0] = 179.0 * self.frame_back[:, :, 0]
             self.frame_back[:, :, 1:3] = 255.0 * self.frame_back[:, :, 1:3]
             self.frame_back = self.frame_back.astype('uint8')
@@ -345,32 +353,48 @@ class HueSwirlChain(vv.Effect):
                     and (iter_index % 2 == 0):
                 # need to update and store frame mask
                 # two blur passes from previously stored mask
-                frame_mask_temp = cv2.medianBlur(
-                    self.frame_mask_list[fr_indx][iter_index - 2],
-                    mask_blur)
-                frame_mask_temp = cv2.medianBlur(
-                    frame_mask_temp,
-                    mask_blur)
+                if self.style == 0:
+                    frame_mask_temp = cv2.GaussianBlur(
+                        self.frame_mask_list[fr_indx][iter_index - 2],
+                        (mask_blur, mask_blur),
+                        0)
+                    frame_mask_temp = cv2.GaussianBlur(
+                        frame_mask_temp,
+                        (mask_blur, mask_blur),
+                        0)
+                elif self.style == 1:
+                    frame_mask_temp = cv2.medianBlur(
+                        self.frame_mask_list[fr_indx][iter_index - 2],
+                        mask_blur)
+                    frame_mask_temp = cv2.medianBlur(
+                        frame_mask_temp,
+                        mask_blur)
                 self.frame_mask_list[fr_indx][iter_index] = frame_mask_temp
-                self.frame_mask[fr_indx] = frame_mask_temp
+                self.frame_masks[fr_indx] = frame_mask_temp
             elif (self.frame_mask_list[fr_indx][iter_index] is None) and \
                     (iter_index % 2 == 1):
                 # need to update but not store frame mask
-                self.frame_mask[fr_indx] = cv2.medianBlur(
-                    self.frame_mask_list[fr_indx][iter_index - 1],
-                    mask_blur)
+                if self.style == 0:
+                    self.frame_masks[fr_indx] = cv2.GaussianBlur(
+                        self.frame_mask_list[fr_indx][iter_index - 1],
+                        (mask_blur, mask_blur),
+                        0)
+                elif self.style == 1:
+                    self.frame_masks[fr_indx] = cv2.medianBlur(
+                        self.frame_mask_list[fr_indx][iter_index - 1],
+                        mask_blur)
 
         # combine masks
         if self.curr_blend_level is not 0:
             # blend masks
             frame_mask = cv2.addWeighted(
-                self.frame_mask_list[curr_fr_indx][iter_index],
+                self.frame_masks[curr_fr_indx],
                 1.0 - self.curr_blend_level / self.num_blend_levels,
-                self.frame_mask_list[next_fr_indx][iter_index],
+                self.frame_masks[next_fr_indx],
                 self.curr_blend_level / self.num_blend_levels,
                 0)
         else:
-            frame_mask = self.frame_mask_list[curr_fr_indx][iter_index]
+            frame_mask = self.frame_masks[curr_fr_indx]
 
         # get masked then blurred background
         frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
