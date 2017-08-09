@@ -200,7 +200,7 @@ class HueSwirlChain(vv.Effect):
 
         # control parameters (use _process_io for clipping and modding)
         if self.auto_play:
-            self.PROPS[3]['VAL'] += 1  # final mask offset
+            # self.PROPS[3]['VAL'] += 1  # final mask offset
             self.PROPS[5]['VAL'] += 0.1  # hue offset
 
         # process keyboard input
@@ -254,8 +254,14 @@ class HueSwirlChain(vv.Effect):
             self.frame_mask_list[self.curr_frame_index] = \
                 [None for _ in range(self.PROPS[4]['MAX'] + 1)]
             # load new image
-            self.frame[self.curr_frame_index] = \
-                cv2.imread(self.file_list[self.file_index])
+            temp_frame = cv2.imread(self.file_list[self.file_index])
+            hw = temp_frame.shape
+            temp_frame = cv2.getRectSubPix(
+                temp_frame,
+                (256, 256),
+                (hw[1]/2, hw[0]/2))
+            self.frame[self.curr_frame_index] = temp_frame
+
             self.frame[self.curr_frame_index] = util.resize(
                 self.frame[self.curr_frame_index],
                 self.frame_width,
@@ -414,4 +420,5 @@ class HueSwirlChain(vv.Effect):
                 frame_back_blurred[:, :, chan],
                 final_offset - frame_mask)
 
+        # _, frame = cv2.threshold(frame, 32, 255, cv2.THRESH_BINARY)
         return frame
