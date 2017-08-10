@@ -88,3 +88,42 @@ def resize(frame, frame_width, frame_height, interpolation=cv2.INTER_LINEAR):
         interpolation=interpolation)
 
     return frame
+
+
+def get_sources():
+    # file_type options : 'cam' | 'video' | 'image' | 'auto'
+    source_list = []
+    source_list.append({
+        'file_loc': 'hueswirlchain',
+        'file_type': 'auto'})
+    source_list.append({
+        'file_loc': None,
+        'file_type': 'cam'})
+    source_list.append({
+        'file_loc': '/media/data/Dropbox/Git/vid-viz/data/snowflake-02.mp4',
+        'file_type': 'video'})
+    source_list.append({
+        'file_loc': '/media/data/Dropbox/Git/vid-viz/data/tree-00.jpg',
+        'file_type': 'image'})
+    source_list.append({
+        'file_loc': '/media/data/Dropbox/Git/vid-viz/data/honeycomb-00.jpg',
+        'file_type': 'image'})
+    # source_list.append({
+    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-00.jpg',
+    #     'file_type': 'image'})
+    # source_list.append({
+    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-01.jpg',
+    #     'file_type': 'image'})
+    # source_list.append({
+    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-02.jpg',
+    #     'file_type': 'image'})
+    # source_list.append({
+    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-03.jpg',
+    #     'file_type': 'image'})
+    source_list.append({
+        'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-04.jpg',
+        'file_type': 'image'})
+    # source_list.append({
+    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-05.jpg',
+    #     'file_type': 'image'})
+    return source_list
