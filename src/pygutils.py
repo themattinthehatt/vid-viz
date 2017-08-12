@@ -34,8 +34,8 @@
 # ----------------------------------------------------------------------------
 
 import numpy as np
+import ctypes
 import pyglet
-from pyglet.window import key
 
 
 class NumpyImage(pyglet.image.ImageData):
@@ -68,7 +68,7 @@ class NumpyImage(pyglet.image.ImageData):
                 elif depth == 4:
                     format = 'RGBA'
                 elif depth == 1:
-                    format = 'L'
+                    format = 'G'
                 else:
                     raise ValueError(
                         "could not determine a format for depth %d" % depth)
@@ -81,16 +81,16 @@ class NumpyImage(pyglet.image.ImageData):
         self.arr = arr
         self.view_new_array(arr)
 
-    def _convert(self, format, pitch):
-        if format == self._current_format and pitch == self._current_pitch:
-            return self.numpy_data_ptr
-        else:
-            raise NotImplementedError(
-                "no support for changing numpy format/pitch")
-
-    def _ensure_string_data(self):
-        raise RuntimeError(
-            "we should never get here - we are trying to avoid data copying")
+    # def _convert(self, format, pitch):
+    #     if format == self._current_format and pitch == self._current_pitch:
+    #         return self.numpy_data_ptr
+    #     else:
+    #         raise NotImplementedError(
+    #             "no support for changing numpy format/pitch")
+    #
+    # def _ensure_string_data(self):
+    #     raise RuntimeError(
+    #         "we should never get here - we are trying to avoid data copying")
 
     def dirty(self):
         '''Force an update of the texture data.
@@ -99,7 +99,7 @@ class NumpyImage(pyglet.image.ImageData):
         texture = self.texture
         internalformat = None
         self.blit_to_texture(texture.target, texture.level, 0, 0, 0,
-                             internalformat)
+                             internalformat=internalformat)
 
     def view_new_array(self, arr):
         '''View a new numpy array of the same shape.
@@ -124,143 +124,46 @@ class NumpyImage(pyglet.image.ImageData):
 
 
 class MyWindow(pyglet.window.Window):
-    def __init__(self, frame, *args, **kwargs):
+    def __init__(self, disp_fps, *args, **kwargs):
         # call pyglet.window.Window constructor
         super(MyWindow, self).__init__(*args, **kwargs)
-        # store numpy array
-        self.np_array = frame
-        # store ctype
-        self.np_image = NumpyImage(frame)
-        # add key_list attribute
-        self.key_list = [False for i in range(256)]
-        # add current key attribute
-        self.key = 0
+        # keep image data clean for now
+        self.image_data = None
+        # save current key press
+        self.pyg_key = 0
+        # display fps in window
+        if disp_fps:
+            self.fps_display = pyglet.clock.ClockDisplay()
+        else:
+            self.fps_display = None
         self.x = 0
         self.y = 0
 
+    def to_c(self, arr):
+        arr1 = np.swapaxes(np.swapaxes(arr, 0, 2), 1, 2)
+        # noinspection PyUnresolvedReferences
+        # ab = (bound_scale * (arr + bound)).astype('uint8')
+        return arr1.astype('uint8').ctypes.data_as(
+            ctypes.POINTER(ctypes.c_ubyte))
+
+    def set_image_data(self, numpy_image):
+        height, width, depth = numpy_image.shape
+        if self.image_data is None:
+            self.image_data = pyglet.image.ImageData(
+                width, height, 'RGB', self.to_c(numpy_image), width * 3)
+        else:
+            self.image_data.set_data('RGB', width * 3, self.to_c(numpy_image))
+
     def on_draw(self):
         self.clear()
-        if self.key_list[ord('a')]:
-            self.x -= 10
-        elif self.key_list[ord('d')]:
-            self.x += 10
-        self.np_image.texture.blit(self.x, self.y)
-        self.clear_key_press()
+        if self.image_data is not None:
+            self.image_data.blit(self.x, self.y)
+        if self.fps_display is not None:
+            self.fps_display.draw()
 
     def on_key_press(self, symbol, modifiers):
         # update key list
-        # if symbol == key.A:
-        #     pass
-        # elif symbol == key.LEFT:
-        #     self.np_image.view_new_array(self.np_array)
-        # elif symbol == key.ENTER:
-        #     self.np_image.view_new_array(np.zeros_like(self.np_array))
-        # elif symbol == key.ESCAPE:
-        #     self.key_list[0] = True
-
-        if symbol == key.A:
-            self.key = ord('a')
-        elif symbol == key.B:
-            self.key = ord('b')
-        elif symbol == key.C:
-            self.key = ord('c')
-        elif symbol == key.D:
-            self.key = ord('d')
-        elif symbol == key.E:
-            self.key = ord('e')
-        elif symbol == key.F:
-            self.key = ord('f')
-        elif symbol == key.G:
-            self.key = ord('g')
-        elif symbol == key.H:
-            self.key = ord('h')
-        elif symbol == key.I:
-            self.key = ord('i')
-        elif symbol == key.J:
-            self.key = ord('j')
-        elif symbol == key.K:
-            self.key = ord('k')
-        elif symbol == key.L:
-            self.key = ord('l')
-        elif symbol == key.M:
-            self.key = ord('m')
-        elif symbol == key.N:
-            self.key = ord('n')
-        elif symbol == key.O:
-            self.key = ord('o')
-        elif symbol == key.P:
-            self.key = ord('p')
-        elif symbol == key.Q:
-            self.key = ord('q')
-        elif symbol == key.R:
-            self.key = ord('r')
-        elif symbol == key.S:
-            self.key = ord('s')
-        elif symbol == key.T:
-            self.key = ord('t')
-        elif symbol == key.U:
-            self.key = ord('u')
-        elif symbol == key.V:
-            self.key = ord('v')
-        elif symbol == key.W:
-            self.key = ord('w')
-        elif symbol == key.X:
-            self.key = ord('x')
-        elif symbol == key.Y:
-            self.key = ord('y')
-        elif symbol == key.Z:
-            self.key = ord('z')
-
-        elif symbol == key.ESCAPE:
-            self.key = 27
-        elif symbol == key.GRAVE:
-            self.key = ord('`')
-        elif symbol == key.MINUS:
-            self.key = ord('-')
-        elif symbol == key.EQUAL:
-            self.key = ord('=')
-        elif symbol == key.BACKSPACE:
-            self.key = ord('\b')
-        elif symbol == key.BRACKETLEFT:
-            self.key = ord('[')
-        elif symbol == key.BRACKETRIGHT:
-            self.key = ord(']')
-        elif symbol == key.BACKSLASH:
-            self.key = ord('\\')
-        elif symbol == key.SEMICOLON:
-            self.key = ord(';')
-        elif symbol == key.APOSTROPHE:
-            self.key = ord('\'')
-        elif symbol == key.ENTER or key.RETURN:
-            self.key = ord('\n')
-        elif symbol == key.COMMA:
-            self.key = ord(',')
-        elif symbol == key.PERIOD:
-            self.key = ord('.')
-        elif symbol == key.SLASH:
-            self.key = ord('/')
-        elif symbol == key.SPACE:
-            self.key = ord(' ')
-        elif symbol == key.TAB:
-            self.key = ord('\t')
-
-        elif symbol == key.LEFT:
-            self.key = ord('Q')
-        elif symbol == key.RIGHT:
-            self.key = ord('S')
-        elif symbol == key.UP:
-            self.key = ord('T')
-        elif symbol == key.DOWN:
-            self.key = ord('R')
-
-        else:
-            self.key = 0
-
-        self.key_list[self.key] = True
-        # print(self.key)
-        # print(self.key_list[self.key])
+        self.pyg_key = symbol
 
     def clear_key_press(self):
-
-        self.key_list[self.key] = False
-        self.key = 0
+        self.pyg_key = 0
