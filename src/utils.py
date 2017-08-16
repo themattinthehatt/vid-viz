@@ -97,9 +97,6 @@ def get_sources():
     #     'file_loc': 'hueswirlchain',
     #     'file_type': 'auto'})
     # source_list.append({
-    #     'file_loc': None,
-    #     'file_type': 'cam'})
-    # source_list.append({
     #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/snowflake-02.mp4',
     #     'file_type': 'video'})
     source_list.append({
@@ -108,6 +105,9 @@ def get_sources():
     source_list.append({
         'file_loc': '/media/data/Dropbox/Git/vid-viz/data/honeycomb-00.jpg',
         'file_type': 'image'})
+    source_list.append({
+        'file_loc': None,
+        'file_type': 'cam'})
     # source_list.append({
     #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-00.jpg',
     #     'file_type': 'image'})

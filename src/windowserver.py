@@ -8,6 +8,9 @@ import src.auto as auto
 
 
 class WindowServer(object):
+    """WindowServer object controls loading/generation of source frame, 
+    process the frame, and then returns the frame as a numpy array to be 
+    rendered in the active window"""
 
     def __init__(self, window_width=100, window_height=100):
 
@@ -22,8 +25,7 @@ class WindowServer(object):
             vv.RGBBurst(),  # 3
             vv.HueBloom(),  # 4
             vv.HueSwirl(),  # 5
-            vv.HueSwirlMover(),  # 6
-            vv.HueCrusher()]  # 7
+            vv.HueSwirlMover()]  # 6
         self.effect_index = None
         self.num_effects = len(self.effects)
 
@@ -49,8 +51,6 @@ class WindowServer(object):
         self.total_frame_count = 0
         self.cap = None
         self.frame_mask = None
-        self.window_height = 500
-        self.window_width = 500
         self.auto_effect = None
         self.frame_orig = None
 
@@ -58,8 +58,6 @@ class WindowServer(object):
 
         # parse keyboard input
         if self.key_list[ord('q')]:
-            self.source_index = (self.source_index + 1) % self.num_sources
-            self.new_source = True
             # quit current effect
             self.effect_index = None
         elif self.key_list[ord('\b')]:
@@ -69,7 +67,6 @@ class WindowServer(object):
         elif self.key_list[ord(' ')]:
             self.source_index = (self.source_index + 1) % self.num_sources
             self.new_source = True
-            print('spacebar')
         elif self.key_list[ord('\t')]:
             # only change post-processing order if in post-process mode
             if self.post_process:
@@ -80,92 +77,93 @@ class WindowServer(object):
 
             # reset necessary parameters
             self.new_source = False
-            # self.effect_index = None
-            # self.fr_count = 0
-            # for _, effect in enumerate(self.effects):
-            #     effect.reset()
-            # self.border.reset()
-            # self.postproc.reset()
-            #
-            # # free previous resources
-            # if self.source_type is 'cam' or self.source_type is 'video':
-            #     self.cap.release()
+            self.effect_index = None
+            self.fr_count = 0
+            for _, effect in enumerate(self.effects):
+                effect.reset()
+            self.border.reset()
+            self.postproc.reset()
+
+            # free previous resources
+            if self.source_type is 'cam' or self.source_type is 'video':
+                self.cap.release()
 
             # load source
             self.source_type = self.source_list[self.source_index]['file_type']
             source_loc = self.source_list[self.source_index]['file_loc']
             if self.source_type is 'cam':
-                pass
-            #     self.cap = cv2.VideoCapture(0)
-            #     self.total_frame_count = float('inf')
-            #     self.frame_mask = None
-            # elif self.source_type is 'video':
-            #     cap = cv2.VideoCapture(source_loc)
-            #     self.total_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            #     self.frame_mask = None
+                # pass
+                self.cap = cv2.VideoCapture(0)
+                self.total_frame_count = float('inf')
+                self.frame_mask = None
+            elif self.source_type is 'video':
+                cap = cv2.VideoCapture(source_loc)
+                self.total_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.frame_mask = None
             elif self.source_type is 'image':
                 self.frame_orig = cv2.imread(source_loc)
                 self.total_frame_count = float('inf')
                 self.frame_mask = np.copy(self.frame_orig)
-            # elif self.source_type is 'auto':
-            #     if source_loc is 'hueswirlchain':
-            #         self.auto_effect = auto.HueSwirlChain(
-            #             self.window_width, self.window_height)
-            #     else:
-            #         print('Invalid auto effect')
-            #         self.total_frame_count = float('inf')
+            elif self.source_type is 'auto':
+                if source_loc is 'hueswirlchain':
+                    self.auto_effect = auto.HueSwirlChain(
+                        self.window_width, self.window_height)
+                else:
+                    print('Invalid auto effect')
+                    self.total_frame_count = float('inf')
             else:
                 print('Invalid source_type')
 
         # # get frame and relevant info
-        # if self.source_type is 'cam' or self.source_type is 'video':
-        #     ret, frame = cap.read()
-        # elif self.source_type is 'image':
-        frame = np.copy(self.frame_orig)
-        # elif self.source_type is 'auto':
-        #     frame = self.auto_effect.process(self.key_list)
+        if self.source_type is 'cam' or self.source_type is 'video':
+            ret, frame = self.cap.read()
+        elif self.source_type is 'image':
+            frame = np.copy(self.frame_orig)
+        elif self.source_type is 'auto':
+            frame = self.auto_effect.process(self.key_list)
 
         if self.source_type is not 'auto':
             # get uniform frame sizes
             frame = utils.resize(frame, self.window_width, self.window_height)
 
-        # # update current effect
-        # if self.effect_index is None:
-        #     for num in range(10):
-        #         if self.key == ord(str(num)):
-        #             self.effect_index = num
-        #             self.key_list[self.key] = False
-        #
-        # # apply borders before effect
-        # if self.post_process_pre:
-        #     if self.post_process:
-        #         frame = self.border.process(frame, self.key_list)
-        #     else:
-        #         frame = self.border.process(frame, self.key_list,
-        #                                     key_lock=True)
-        #
-        # # process frame
-        # if self.source_type is not 'auto' and self.effect_index is not None:
-        #     if self.post_process:
-        #         frame = self.effects[self.effect_index].process(
-        #             frame, self.key_list, key_lock=True)
-        #     else:
-        #         frame = self.effects[self.effect_index].process(
-        #             frame, self.key_list)
-        #
-        # # apply borders after effect
-        # if not self.post_process_pre:
-        #     if self.post_process:
-        #         frame = self.border.process(frame, self.key_list)
-        #         #             frame = postproc.process(frame, key_list)
-        #     else:
-        #         frame = self.border.process(frame, self.key_list,
-        #                                     key_lock=True)
-        #         # frame = postproc.process(frame, key_list, key_lock=True)
+        # update current effect
+        if self.effect_index is None:
+            for num in range(10):
+                if self.key == ord(str(num)):
+                    print('Effect %g' % num)
+                    self.effect_index = num
+                    self.key_list[self.key] = False
+
+        # apply borders before effect
+        if self.post_process_pre:
+            if self.post_process:
+                frame = self.border.process(frame, self.key_list)
+            else:
+                frame = self.border.process(frame, self.key_list,
+                                            key_lock=True)
+
+        # process frame
+        if self.source_type is not 'auto' and self.effect_index is not None:
+            if self.post_process:
+                frame = self.effects[self.effect_index].process(
+                    frame, self.key_list, key_lock=True)
+            else:
+                frame = self.effects[self.effect_index].process(
+                    frame, self.key_list)
+
+        # apply borders after effect
+        if not self.post_process_pre:
+            if self.post_process:
+                frame = self.border.process(frame, self.key_list)
+                #             frame = postproc.process(frame, key_list)
+            else:
+                frame = self.border.process(frame, self.key_list,
+                                            key_lock=True)
+                # frame = postproc.process(frame, key_list, key_lock=True)
 
         self.clear_key_press()
 
-        return frame
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     def update_key_list(self, symbol):
         """`symbol` is a pyglet key symbol"""
@@ -223,6 +221,27 @@ class WindowServer(object):
         elif symbol == key.Z:
             self.key = ord('z')
 
+        elif symbol == key._0:
+            self.key = ord('0')
+        elif symbol == key._1:
+            self.key = ord('1')
+        elif symbol == key._2:
+            self.key = ord('2')
+        elif symbol == key._3:
+            self.key = ord('3')
+        elif symbol == key._4:
+            self.key = ord('4')
+        elif symbol == key._5:
+            self.key = ord('5')
+        elif symbol == key._6:
+            self.key = ord('6')
+        elif symbol == key._7:
+            self.key = ord('7')
+        elif symbol == key._8:
+            self.key = ord('8')
+        elif symbol == key._9:
+            self.key = ord('9')
+
         elif symbol == key.ESCAPE:
             self.key = 27
         elif symbol == key.GRAVE:
@@ -243,9 +262,10 @@ class WindowServer(object):
             self.key = ord(';')
         elif symbol == key.APOSTROPHE:
             self.key = ord('\'')
-        elif symbol == key.ENTER or key.RETURN:
-            self.key = ord('\n')
-        elif symbol == key.COMMA:
+        # elif symbol == key.ENTER or key.RETURN:
+            # self.key = ord('\n')
+            # print('enter')
+        elif symbol == key.COMMA:  # key.COMMA:
             self.key = ord(',')
         elif symbol == key.PERIOD:
             self.key = ord('.')
@@ -272,5 +292,12 @@ class WindowServer(object):
 
     def clear_key_press(self):
 
-        self.key_list[self.key] = False
-        self.key = 0
+        # don't clear escape
+        if self.key != 27:
+            self.key_list[self.key] = False
+            self.key = 0
+
+    def close(self):
+        # free previous resources
+        if self.source_type is 'cam' or self.source_type is 'video':
+            self.cap.release()

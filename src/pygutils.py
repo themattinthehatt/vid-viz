@@ -140,7 +140,7 @@ class MyWindow(pyglet.window.Window):
         self.y = 0
 
     def to_c(self, arr):
-        arr1 = np.swapaxes(np.swapaxes(arr, 0, 2), 1, 2)
+        arr1 = np.swapaxes(np.swapaxes(np.flip(arr, 0), 0, 2), 1, 2)
         # noinspection PyUnresolvedReferences
         # ab = (bound_scale * (arr + bound)).astype('uint8')
         return arr1.astype('uint8').ctypes.data_as(
@@ -153,6 +153,10 @@ class MyWindow(pyglet.window.Window):
                 width, height, 'RGB', self.to_c(numpy_image), width * 3)
         else:
             self.image_data.set_data('RGB', width * 3, self.to_c(numpy_image))
+
+    def update(self, dt):
+        if self.image_data is not None:
+            self.image_data.blit(self.x, self.y)
 
     def on_draw(self):
         self.clear()

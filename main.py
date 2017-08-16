@@ -9,7 +9,7 @@ KEYBOARD INPUTS:
         3 - rgbburst
         4 - huebloom
         5 - hueswirl
-        6 - huecrusher
+        6 - hueswirlmover
     q - quit effect (then number keys are once again available for choosing 
         a new effect)
     ` - enable toggling of border effects ('t' to toggle, tab to switch 
@@ -35,7 +35,7 @@ window_height = int(1200 / 2)
 # window_width = int(1024)
 # window_height = int(768)
 disp_fps = True
-target_fps = 30.0
+target_fps = 25.0
 
 # create window with pyglet
 if disp_full_screen:
@@ -49,8 +49,9 @@ else:
         disp_fps,
         width=window_width,
         height=window_height,
-        resizable=False)
-    window.set_location(100, 800)
+        resizable=False,
+        vsync=False)
+    window.set_location(100, 50)
 
 # create object to serve frames to pyglet window
 server = ws.WindowServer(window_width=window_width,
@@ -62,12 +63,6 @@ def loop(dt):
     # update keyboard input
     server.update_key_list(window.pyg_key)
 
-    # exit program if desired
-    if server.key_list[27]:
-        # escape key has been pressed
-        window.close()
-        pyglet.app.exit()
-
     # generate new frame
     frame = server.process()
 
@@ -77,6 +72,14 @@ def loop(dt):
     # clear out key presses
     window.clear_key_press()
 
-pyglet.clock.set_fps_limit(target_fps)
-pyglet.clock.schedule_interval(loop, 1. / target_fps)
+    # exit program if desired
+    if server.key_list[27]:
+        # escape key has been pressed
+        server.close()
+        window.close()
+        pyglet.app.exit()
+
+# pyglet.clock.set_fps_limit(10)
+# pyglet.clock.schedule(window.update)
+pyglet.clock.schedule_interval(loop, 1.0 / target_fps)
 pyglet.app.run()
