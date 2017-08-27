@@ -23,6 +23,8 @@ from __future__ import print_function
 from __future__ import division
 
 import cv2
+import sys
+sys.path.append('lib/pyglet-1.2.4-py2.7.egg')
 import pyglet
 
 import src.pygutils as putil
@@ -30,7 +32,7 @@ import src.windowserver as ws
 
 
 # general user parameters
-window_manager = 'opencv'  # 'opencv' | 'pyglet'
+window_manager = 'pyglet'  # 'opencv' | 'pyglet'
 disp_full_screen = False
 window_width = int(1980 / 2)
 window_height = int(1200 / 2)

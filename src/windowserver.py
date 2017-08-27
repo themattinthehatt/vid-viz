@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+import sys
+sys.path.append('lib/pyglet-1.2.4-py2.7.egg')
 import pyglet.window.key as key
 
 import src.viztools as vv
