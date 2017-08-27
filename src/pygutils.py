@@ -35,8 +35,6 @@
 
 import numpy as np
 import ctypes
-import sys
-sys.path.append('lib/pyglet-1.2.4-py2.7.egg')
 import pyglet
 
 
@@ -222,62 +220,62 @@ class ArrayInterfaceImage(pyglet.image.ImageData):
         self.dirty()
 
 
-class MyWindow(pyglet.window.Window):
-    def __init__(self, disp_fps, *args, **kwargs):
-        # call pyglet.window.Window constructor
-        super(MyWindow, self).__init__(*args, **kwargs)
-        # keep image data clean for now
-        self.image_data = None
-        # save current key press
-        self.pyg_key = 0
-        # display fps in window
-        if disp_fps:
-            self.fps_display = pyglet.clock.ClockDisplay()
-        else:
-            self.fps_display = None
-        self.x = 0
-        self.y = 0
-
-    def to_c(self, arr):
-        arr = np.swapaxes(np.swapaxes(np.flip(arr, 0), 0, 2), 1, 2)
-        # bound = 0.1
-        # bound_scale = 1 / (2. * bound)
-        # ab = (bound_scale * (arr + bound)).astype('uint8')
-        # arr2 = np.copy(arr1)
-        # arr = np.array(arr, copy=True)
-        return arr.astype('uint8').ctypes.data_as(
-            ctypes.POINTER(ctypes.c_ubyte))
-        # return ab.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte))
-        # return (GLubyte * arr.size)(*arr.ravel().astype('uint8'))
-
-    def set_image_data(self, numpy_image):
-        height, width, depth = numpy_image.shape
-        if self.image_data is None:
-            # self.image_data = ArrayInterfaceImage(numpy_image)
-            self.image_data = pyglet.image.ImageData(
-                width, height, 'RGB', self.to_c(numpy_image), width * 3)
-        else:
-            # self.image_data = pyglet.image.ImageData(
-            #     width, height, 'RGB', self.to_c(numpy_image), width * 3)
-            # self.image_data.view_new_array(numpy_image)
-            self.image_data.set_data('RGB', width * 3, self.to_c(numpy_image))
-            # self.image_data.blit_to_texture(
-            #     self.image_data.texture.target,
-            #     self.image_data.texture.level, 0, 0, 0)
-
-    def on_draw(self):
-        self.clear()
-        if self.image_data is not None:
-            self.image_data.blit(self.x, self.y)
-        else:
-            print('NoneType image data')
-        if self.fps_display is not None:
-            self.fps_display.draw()
-        self.flip()
-
-    def on_key_press(self, symbol, modifiers):
-        # update key list
-        self.pyg_key = symbol
-
-    def clear_key_press(self):
-        self.pyg_key = 0
+# class MyWindow(pyglet.window.Window):
+#     def __init__(self, disp_fps, *args, **kwargs):
+#         # call pyglet.window.Window constructor
+#         super(MyWindow, self).__init__(*args, **kwargs)
+#         # keep image data clean for now
+#         self.image_data = None
+#         # save current key press
+#         self.pyg_key = 0
+#         # display fps in window
+#         if disp_fps:
+#             self.fps_display = pyglet.clock.ClockDisplay()
+#         else:
+#             self.fps_display = None
+#         self.x = 0
+#         self.y = 0
+#
+#     def to_c(self, arr):
+#         arr = np.swapaxes(np.swapaxes(np.flip(arr, 0), 0, 2), 1, 2)
+#         # bound = 0.1
+#         # bound_scale = 1 / (2. * bound)
+#         # ab = (bound_scale * (arr + bound)).astype('uint8')
+#         # arr2 = np.copy(arr1)
+#         # arr = np.array(arr, copy=True)
+#         return arr.astype('uint8').ctypes.data_as(
+#             ctypes.POINTER(ctypes.c_ubyte))
+#         # return ab.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte))
+#         # return (GLubyte * arr.size)(*arr.ravel().astype('uint8'))
+#
+#     def set_image_data(self, numpy_image):
+#         height, width, depth = numpy_image.shape
+#         if self.image_data is None:
+#             # self.image_data = ArrayInterfaceImage(numpy_image)
+#             self.image_data = pyglet.image.ImageData(
+#                 width, height, 'RGB', self.to_c(numpy_image), width * 3)
+#         else:
+#             # self.image_data = pyglet.image.ImageData(
+#             #     width, height, 'RGB', self.to_c(numpy_image), width * 3)
+#             # self.image_data.view_new_array(numpy_image)
+#             self.image_data.set_data('RGB', width * 3, self.to_c(numpy_image))
+#             # self.image_data.blit_to_texture(
+#             #     self.image_data.texture.target,
+#             #     self.image_data.texture.level, 0, 0, 0)
+#
+#     def on_draw(self):
+#         self.clear()
+#         if self.image_data is not None:
+#             self.image_data.blit(self.x, self.y)
+#         else:
+#             print('NoneType image data')
+#         if self.fps_display is not None:
+#             self.fps_display.draw()
+#         self.flip()
+#
+#     def on_key_press(self, symbol, modifiers):
+#         # update key list
+#         self.pyg_key = symbol
+#
+#     def clear_key_press(self):
+#         self.pyg_key = 0

@@ -1,11 +1,9 @@
 import numpy as np
 import cv2
-import sys
-sys.path.append('lib/pyglet-1.2.4-py2.7.egg')
-import pyglet.window.key as key
 
 import src.viztools as vv
 import src.utils as utils
+import src.cvutils as cvutils
 import src.auto as auto
 
 
@@ -131,7 +129,8 @@ class WindowServer(object):
             if frame is None:
                 raise TypeError('Frame is NoneType??')
             # get uniform frame sizes
-            frame = utils.resize(frame, self.window_width, self.window_height)
+            frame = cvutils.resize(frame,
+                                   self.window_width, self.window_height)
 
         # update current effect
         if self.effect_index is None:
@@ -182,133 +181,11 @@ class WindowServer(object):
         elif self.formats == 'BGR':
             return frame
 
-    def update_key_list(self, symbol):
-        """`symbol` is a pyglet key symbol"""
-
-        if symbol == key.A:
-            self.key = ord('a')
-        elif symbol == key.B:
-            self.key = ord('b')
-        elif symbol == key.C:
-            self.key = ord('c')
-        elif symbol == key.D:
-            self.key = ord('d')
-        elif symbol == key.E:
-            self.key = ord('e')
-        elif symbol == key.F:
-            self.key = ord('f')
-        elif symbol == key.G:
-            self.key = ord('g')
-        elif symbol == key.H:
-            self.key = ord('h')
-        elif symbol == key.I:
-            self.key = ord('i')
-        elif symbol == key.J:
-            self.key = ord('j')
-        elif symbol == key.K:
-            self.key = ord('k')
-        elif symbol == key.L:
-            self.key = ord('l')
-        elif symbol == key.M:
-            self.key = ord('m')
-        elif symbol == key.N:
-            self.key = ord('n')
-        elif symbol == key.O:
-            self.key = ord('o')
-        elif symbol == key.P:
-            self.key = ord('p')
-        elif symbol == key.Q:
-            self.key = ord('q')
-        elif symbol == key.R:
-            self.key = ord('r')
-        elif symbol == key.S:
-            self.key = ord('s')
-        elif symbol == key.T:
-            self.key = ord('t')
-        elif symbol == key.U:
-            self.key = ord('u')
-        elif symbol == key.V:
-            self.key = ord('v')
-        elif symbol == key.W:
-            self.key = ord('w')
-        elif symbol == key.X:
-            self.key = ord('x')
-        elif symbol == key.Y:
-            self.key = ord('y')
-        elif symbol == key.Z:
-            self.key = ord('z')
-
-        elif symbol == key._0:
-            self.key = ord('0')
-        elif symbol == key._1:
-            self.key = ord('1')
-        elif symbol == key._2:
-            self.key = ord('2')
-        elif symbol == key._3:
-            self.key = ord('3')
-        elif symbol == key._4:
-            self.key = ord('4')
-        elif symbol == key._5:
-            self.key = ord('5')
-        elif symbol == key._6:
-            self.key = ord('6')
-        elif symbol == key._7:
-            self.key = ord('7')
-        elif symbol == key._8:
-            self.key = ord('8')
-        elif symbol == key._9:
-            self.key = ord('9')
-
-        elif symbol == key.ESCAPE:
-            self.key = 27
-        elif symbol == key.GRAVE:
-            self.key = ord('`')
-        elif symbol == key.MINUS:
-            self.key = ord('-')
-        elif symbol == key.EQUAL:
-            self.key = ord('=')
-        elif symbol == key.BACKSPACE:
-            self.key = ord('\b')
-        elif symbol == key.BRACKETLEFT:
-            self.key = ord('[')
-        elif symbol == key.BRACKETRIGHT:
-            self.key = ord(']')
-        elif symbol == key.BACKSLASH:
-            self.key = ord('\\')
-        elif symbol == key.SEMICOLON:
-            self.key = ord(';')
-        elif symbol == key.APOSTROPHE:
-            self.key = ord('\'')
-        # elif symbol == key.ENTER or key.RETURN:
-            # self.key = ord('\n')
-            # print('enter')
-        elif symbol == key.COMMA:  # key.COMMA:
-            self.key = ord(',')
-        elif symbol == key.PERIOD:
-            self.key = ord('.')
-        elif symbol == key.SLASH:
-            self.key = ord('/')
-        elif symbol == key.SPACE:
-            self.key = ord(' ')
-        elif symbol == key.TAB:
-            self.key = ord('\t')
-
-        elif symbol == key.LEFT:
-            self.key = ord('Q')
-        elif symbol == key.RIGHT:
-            self.key = ord('S')
-        elif symbol == key.UP:
-            self.key = ord('T')
-        elif symbol == key.DOWN:
-            self.key = ord('R')
-
-        else:
-            self.key = 0
-
+    def update_key_list(self, key):
+        self.key = key
         self.key_list[self.key] = True
 
     def clear_key_press(self):
-
         # don't clear escape
         if self.key != 27:
             self.key_list[self.key] = False
