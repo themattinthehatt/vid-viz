@@ -12,10 +12,11 @@ class WindowServer(object):
     process the frame, and then returns the frame as a numpy array to be 
     rendered in the active window"""
 
-    def __init__(self, window_width=100, window_height=100):
+    def __init__(self, window_width=100, window_height=100, formats='RGB'):
 
         self.window_width = window_width
         self.window_height = window_height
+        self.formats = formats
 
         # initialize processing objects
         self.effects = [
@@ -91,14 +92,15 @@ class WindowServer(object):
             # load source
             self.source_type = self.source_list[self.source_index]['file_type']
             source_loc = self.source_list[self.source_index]['file_loc']
+            print('Loading %s' % source_loc)
             if self.source_type is 'cam':
-                # pass
                 self.cap = cv2.VideoCapture(0)
                 self.total_frame_count = float('inf')
                 self.frame_mask = None
             elif self.source_type is 'video':
-                cap = cv2.VideoCapture(source_loc)
-                self.total_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.cap = cv2.VideoCapture(source_loc)
+                self.total_frame_count = \
+                    int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 self.frame_mask = None
             elif self.source_type is 'image':
                 self.frame_orig = cv2.imread(source_loc)
@@ -112,23 +114,26 @@ class WindowServer(object):
                     print('Invalid auto effect')
                     self.total_frame_count = float('inf')
             else:
-                print('Invalid source_type')
+                raise TypeError('Invalid source_type')
 
-        # # get frame and relevant info
+        # get frame and relevant info
         if self.source_type is 'cam' or self.source_type is 'video':
             ret, frame = self.cap.read()
         elif self.source_type is 'image':
+            # frame = np.copy(self.frame_orig)
             frame = np.copy(self.frame_orig)
         elif self.source_type is 'auto':
             frame = self.auto_effect.process(self.key_list)
 
         if self.source_type is not 'auto':
+            if frame is None:
+                raise TypeError('Frame is NoneType??')
             # get uniform frame sizes
             frame = utils.resize(frame, self.window_width, self.window_height)
 
         # update current effect
         if self.effect_index is None:
-            for num in range(10):
+            for num in range(self.num_effects):
                 if self.key == ord(str(num)):
                     print('Effect %g' % num)
                     self.effect_index = num
@@ -161,9 +166,19 @@ class WindowServer(object):
                                             key_lock=True)
                 # frame = postproc.process(frame, key_list, key_lock=True)
 
+        # control animation
+        self.fr_count += 1
+        if self.fr_count == self.total_frame_count:
+            # reset frame postion to 1 (not zero so window isn't moved)
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 1)
+            self.fr_count = 1
+
         self.clear_key_press()
 
-        return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if self.formats == 'RGB':
+            return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        elif self.formats == 'BGR':
+            return frame
 
     def update_key_list(self, symbol):
         """`symbol` is a pyglet key symbol"""

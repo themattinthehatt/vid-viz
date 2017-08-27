@@ -36,61 +36,128 @@
 import numpy as np
 import ctypes
 import pyglet
+from pyglet.gl import *
+
+def is_c_contiguous(inter):
+    strides = inter.get('strides')
+    shape = inter.get('shape')
+    if strides is None:
+        return True
+    else:
+        test_strides = strides[-1]
+        N = len(strides)
+        for i in range(N-2):
+            test_strides *= test_strides * shape[N-i-1]
+            if test_strides == strides[N-i-2]:
+                continue
+            else:
+                return False
+        return True
 
 
-class NumpyImage(pyglet.image.ImageData):
-    def __init__(self, arr, format=None):
-        '''Initialize numpy-based image data.
+def get_stride0(inter):
+    strides = inter.get('strides')
+    if strides is not None:
+        return strides[0]
+    else:
+        # C contiguous
+        shape = inter.get('shape')
+        cumproduct = 1
+        for i in range(1,len(shape)):
+            cumproduct *= shape[i]
+        return cumproduct
 
+
+class ArrayInterfaceImage(pyglet.image.ImageData):
+    def __init__(self,arr,format=None,allow_copy=True):
+        '''Initialize image data from the numpy array interface
         :Parameters:
             `arr` : array
-                numpy array of data. If rank 2, the shape must be
-                (height, width). If rank 3, the shape is (depth,
-                height, width). Must be C contiguous.
+                data supporting the __array_interface__ protocol. If
+                rank 2, the shape must be (height, width). If rank 3,
+                the shape is (height, width, depth). Typestr must be
+                '|u1' (uint8).
             `format` : str or None
-                If specified, a format string describing the numpy
-                array ('L' or 'RGB'). Defaults to a format determined
-                from the shape of the array.
-
+                If specified, a format string describing the data
+                format array (e.g. 'L', 'RGB', or 'RGBA'). Defaults to
+                a format determined from the shape of the array.
+            `allow_copy` : bool
+                If False, no copies of the data will be made, possibly
+                resulting in exceptions being raised if the data is
+                unsuitable. In particular, the data must be C
+                contiguous in this case. If True (default), the data
+                may be copied to avoid such exceptions.
         '''
-        arr = np.asarray(arr)
-        if not arr.flags['C_CONTIGUOUS']:
-            raise ValueError('numpy array must be C contiguous')
-        if len(arr.shape) == 2:
-            height, width = arr.shape
+
+        self.inter = arr.__array_interface__
+        self.allow_copy = allow_copy
+        self.data_ptr = ctypes.c_void_p()
+        self.data_ptr.value = 0
+
+        if len(self.inter['shape'])==2:
+            height,width = self.inter['shape']
             if format is None:
                 format = 'L'
-        elif len(arr.shape) == 3:
-            height, width, depth = arr.shape
+        elif len(self.inter['shape'])==3:
+            height,width,depth = self.inter['shape']
             if format is None:
-                if depth == 3:
+                if depth==3:
                     format = 'RGB'
-                elif depth == 4:
+                elif depth==4:
                     format = 'RGBA'
-                elif depth == 1:
-                    format = 'G'
+                elif depth==1:
+                    format = 'L'
                 else:
-                    raise ValueError(
-                        "could not determine a format for depth %d" % depth)
+                    raise ValueError("could not determine a format for "
+                                     "depth %d"%depth)
         else:
-            raise ValueError("array must be rank 2 or rank 3")
+            raise ValueError("arr must have 2 or 3 dimensions")
         data = None
-        pitch = arr.strides[0]
-        super(NumpyImage, self).__init__(width, height, format, data,
-                                         pitch=pitch)
-        self.arr = arr
-        self.view_new_array(arr)
+        pitch = get_stride0(self.inter)
+        super(ArrayInterfaceImage, self).__init__(
+            width, height, format, data, pitch=pitch)
 
-    # def _convert(self, format, pitch):
-    #     if format == self._current_format and pitch == self._current_pitch:
-    #         return self.numpy_data_ptr
-    #     else:
-    #         raise NotImplementedError(
-    #             "no support for changing numpy format/pitch")
-    #
-    # def _ensure_string_data(self):
-    #     raise RuntimeError(
-    #         "we should never get here - we are trying to avoid data copying")
+        self.view_new_array( arr )
+
+    def get_data(self):
+        if self._real_string_data is not None:
+            return self._real_string_data
+
+        if not self.allow_copy:
+            raise ValueError("cannot get a view of the data without "
+                             "allowing copy")
+
+        # create a copy of the data in a Python str
+        shape = self.inter['shape']
+        nbytes = 1
+        for i in range(len(shape)):
+            nbytes *= shape[i]
+        mydata = ctypes.create_string_buffer( nbytes )
+        ctypes.memmove( mydata, self.data_ptr, nbytes)
+        return mydata.value
+
+    data = property(get_data,None,"string view of data")
+
+    def _convert(self, format, pitch):
+        if format == self._current_format and pitch == self._current_pitch:
+            # do something with these values to convert to a ctypes.c_void_p
+            if self._real_string_data is None:
+                return self.data_ptr
+            else:
+                # XXX pyglet may copy this to create a pointer to the buffer?
+                return self._real_string_data
+        else:
+            if self.allow_copy:
+                raise NotImplementedError("XXX")
+            else:
+                raise ValueError("cannot convert to desired "
+                                 "format/pitch without copying")
+
+    def _ensure_string_data(self):
+        if self.allow_copy:
+            raise NotImplementedError("XXX")
+        else:
+            raise ValueError("cannot create string data without copying")
 
     def dirty(self):
         '''Force an update of the texture data.
@@ -98,28 +165,58 @@ class NumpyImage(pyglet.image.ImageData):
 
         texture = self.texture
         internalformat = None
-        self.blit_to_texture(texture.target, texture.level, 0, 0, 0,
-                             internalformat=internalformat)
+        self.blit_to_texture(
+            texture.target, texture.level, 0, 0, 0, internalformat )
 
-    def view_new_array(self, arr):
-        '''View a new numpy array of the same shape.
-
+    def view_new_array(self,arr):
+        '''View a new array of the same shape.
         The same texture will be kept, but the data from the new array
         will be loaded.
-
         :Parameters:
             `arr` : array
-                numpy array of data. If rank 2, the shape must be
-                (height, width). If rank 3, the shape is (depth,
-                height, width).
+                data supporting the __array_interface__ protocol. If
+                rank 2, the shape must be (height, width). If rank 3,
+                the shape is (height, width, depth). Typestr must be
+                '|u1' (uint8).
         '''
-        arr = np.asarray(arr)
-        if arr.shape != self.arr.shape:
-            raise ValueError("NumpyImage shape changed!")
-        if not arr.dtype == np.uint8:
-            raise ValueError("only uint8 numpy arrays supported")
-        self.numpy_data_ptr = arr.ctypes.data
-        self.arr = arr  # maintain a reference to numpy array so it's not de-allocated
+
+        inter = arr.__array_interface__
+
+        if not is_c_contiguous(inter):
+            if self.allow_copy:
+                # Currently require numpy to deal with this
+                # case. POSSIBLY TODO: re-implement copying into
+                # string buffer so that numpy is not required.
+                import numpy
+                arr = numpy.array( arr, copy=True, order='C' )
+                inter = arr.__array_interface__
+            else:
+                raise ValueError('copying is not allowed but data is not '
+                                 'C contiguous')
+
+        if inter['typestr'] != '|u1':
+            raise ValueError("data is not type uint8 (typestr=='|u1')")
+
+        if inter['shape'] != self.inter['shape']:
+            raise ValueError("shape changed!")
+
+        self._real_string_data = None
+        self.data_ptr.value = 0
+
+        idata = inter['data']
+        if isinstance(idata,tuple):
+            data_ptr_int,readonly = idata
+            self.data_ptr.value = data_ptr_int
+        elif isinstance(idata,str):
+            self._real_string_data = idata
+        else:
+            raise ValueError("__array_interface__ data attribute was not "
+                             "tuple or string")
+
+        # maintain references so they're not de-allocated
+        self.inter = inter
+        self.arr = arr
+
         self.dirty()
 
 
@@ -140,30 +237,37 @@ class MyWindow(pyglet.window.Window):
         self.y = 0
 
     def to_c(self, arr):
-        arr1 = np.swapaxes(np.swapaxes(np.flip(arr, 0), 0, 2), 1, 2)
+        arr = np.swapaxes(np.swapaxes(np.flip(arr, 0), 0, 2), 1, 2)
         # noinspection PyUnresolvedReferences
         # ab = (bound_scale * (arr + bound)).astype('uint8')
-        return arr1.astype('uint8').ctypes.data_as(
+        # arr2 = np.copy(arr1)
+        # arr = np.array(arr, copy=True)
+        return arr.astype('uint8').ctypes.data_as(
             ctypes.POINTER(ctypes.c_ubyte))
+        # return (GLubyte * arr.size)( *arr.ravel().astype('uint8') )
 
     def set_image_data(self, numpy_image):
         height, width, depth = numpy_image.shape
         if self.image_data is None:
+            # self.image_data = ArrayInterfaceImage(numpy_image)
             self.image_data = pyglet.image.ImageData(
                 width, height, 'RGB', self.to_c(numpy_image), width * 3)
         else:
+            # self.image_data.view_new_array(numpy_image)
             self.image_data.set_data('RGB', width * 3, self.to_c(numpy_image))
-
-    def update(self, dt):
-        if self.image_data is not None:
-            self.image_data.blit(self.x, self.y)
+            self.image_data.blit_to_texture(
+                self.image_data.texture.target,
+                self.image_data.texture.level, 0, 0, 0)
 
     def on_draw(self):
         self.clear()
         if self.image_data is not None:
-            self.image_data.blit(self.x, self.y)
+            self.image_data.texture.blit(self.x, self.y)
+        else:
+            print('NoneType image data')
         if self.fps_display is not None:
             self.fps_display.draw()
+        self.flip()
 
     def on_key_press(self, symbol, modifiers):
         # update key list

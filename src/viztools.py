@@ -419,6 +419,7 @@ class Threshold(Effect):
     def __init__(self):
 
         super(Threshold, self).__init__()
+        self.name = 'threshold'
 
         # user option constants
         THRESH_KERNEL = {
@@ -568,6 +569,7 @@ class Alien(Effect):
     def __init__(self):
 
         super(Alien, self).__init__()
+        self.name = 'alien'
 
         # user option constants
         FREQ = {
@@ -730,6 +732,7 @@ class RGBWalk(Effect):
     def __init__(self):
 
         super(RGBWalk, self).__init__()
+        self.name = 'rgb-walk'
 
         # user option constants
         STEP_SIZE = {
@@ -839,6 +842,7 @@ class RGBBurst(Effect):
     def __init__(self):
 
         super(RGBBurst, self).__init__()
+        self.name = 'rgb-burst'
 
         # user option constants
         FRAME_INT = {
@@ -1049,6 +1053,7 @@ class HueBloom(Effect):
     def __init__(self):
 
         super(HueBloom, self).__init__()
+        self.name = 'hue-bloom'
 
         # user option constants
         DIM_SIZE = {
@@ -1229,6 +1234,7 @@ class HueSwirl(Effect):
     def __init__(self):
 
         super(HueSwirl, self).__init__()
+        self.name = 'hue-swirl'
 
         # user option constants
         DIM_SIZE = {
@@ -1546,6 +1552,7 @@ class HueSwirlMover(Effect):
     def __init__(self):
 
         super(HueSwirlMover, self).__init__()
+        self.name = 'hue-swirl-mover'
 
         # user option constants
         DIM_SIZE = {
@@ -1819,6 +1826,7 @@ class HueCrusher(Effect):
     def __init__(self):
 
         super(HueCrusher, self).__init__()
+        name = 'hue-crusher'
 
         # user option constants
         NUM_CHUNKS = {
