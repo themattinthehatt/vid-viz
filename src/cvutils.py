@@ -1,3 +1,5 @@
+"""Contains OpenCV-specific utility fucntions"""
+
 import numpy as np
 import cv2
 

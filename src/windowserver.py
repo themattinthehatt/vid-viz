@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-import src.viztools as vv
+import src.viztools as filters
 import src.utils as utils
 import src.cvutils as cvutils
 import src.auto as auto
@@ -9,7 +9,7 @@ import src.auto as auto
 
 class WindowServer(object):
     """WindowServer object controls loading/generation of source frame, 
-    process the frame, and then returns the frame as a numpy array to be 
+    processes the frame, and then returns the frame as a numpy array to be 
     rendered in the active window"""
 
     def __init__(self, window_width=100, window_height=100, formats='RGB'):
@@ -20,19 +20,20 @@ class WindowServer(object):
 
         # initialize processing objects
         self.effects = [
-            vv.Threshold(),  # 0
-            vv.Alien(),  # 1
-            vv.RGBWalk(),  # 2
-            vv.RGBBurst(),  # 3
-            vv.HueBloom(),  # 4
-            vv.HueSwirl(),  # 5
-            vv.HueSwirlMover()]  # 6
+            filters.Threshold(),     # 0
+            filters.Alien(),         # 1
+            filters.RGBWalk(),       # 2
+            filters.RGBBurst(),      # 3
+            filters.HueBloom(),      # 4
+            filters.HueSwirl(),      # 5
+            filters.HueSwirlMover()  # 6
+        ]
         self.effect_index = None
         self.num_effects = len(self.effects)
 
         # set pre/post-processing options
-        self.border = vv.Border()
-        self.postproc = vv.PostProcess()
+        self.border = filters.Border()
+        self.postproc = filters.PostProcess()
         self.post_process = False  # post-proc is active effect
         self.post_process_pre = False  # post-proc pre/proceeds other effects
 
@@ -48,18 +49,23 @@ class WindowServer(object):
         self.key_list = [None for _ in range(256)]
 
         # misc
-        self.fr_count = 0
-        self.total_frame_count = 0
-        self.cap = None
-        self.frame_mask = None
-        self.auto_effect = None
-        self.frame_orig = None
+        self.fr_count = 0           # for replaying videos
+        self.total_frame_count = 0  # for replaying videos
+        self.cap = None             # for playing videos and webcam
+        self.frame_mask = None      # ?
+        self.auto_effect = None     # ?
+        self.frame_orig = None      # ?
 
     def process(self):
 
         # parse keyboard input
         if self.key_list[ord('q')]:
             # quit current effect
+            if self.effect_index is not None:
+                print('Quitting %s effect' %
+                      self.effects[self.effect_index].name)
+                print('')
+                print('')
             self.effect_index = None
         elif self.key_list[ord('\b')]:
             self.post_process = False
@@ -120,8 +126,8 @@ class WindowServer(object):
         if self.source_type is 'cam' or self.source_type is 'video':
             ret, frame = self.cap.read()
         elif self.source_type is 'image':
-            # frame = np.copy(self.frame_orig)
             frame = np.copy(self.frame_orig)
+            # frame = self.frame_orig
         elif self.source_type is 'auto':
             frame = self.auto_effect.process(self.key_list)
 
@@ -136,8 +142,8 @@ class WindowServer(object):
         if self.effect_index is None:
             for num in range(self.num_effects):
                 if self.key == ord(str(num)):
-                    print('Effect %g' % num)
                     self.effect_index = num
+                    self.effects[self.effect_index].print_update()
                     self.key_list[self.key] = False
 
         # apply borders before effect
@@ -156,6 +162,9 @@ class WindowServer(object):
             else:
                 frame = self.effects[self.effect_index].process(
                     frame, self.key_list)
+                # output info
+                if self.effects[self.effect_index].update_output:
+                    self.effects[self.effect_index].print_update()
 
         # apply borders after effect
         if not self.post_process_pre:

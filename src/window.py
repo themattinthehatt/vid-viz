@@ -1,3 +1,7 @@
+"""Contains classes for windows using pyglet or OpenCV; functions initialize
+window, render texture to window upon calls to a draw command, and handle 
+implementation-specific parsing of user input (just keyboard for now)"""
+
 import numpy as np
 import ctypes
 import pyglet

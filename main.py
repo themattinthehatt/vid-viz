@@ -33,7 +33,7 @@ import src.windowserver as ws
 
 # general user parameters
 window_manager = 'opencv'  # 'opencv' | 'pyglet'
-disp_fullscreen = True
+disp_fullscreen = False
 window_width = int(1980 / 2)
 window_height = int(1200 / 2)
 # window_width = int(1024)

@@ -1,3 +1,4 @@
+"""Contains pyglet-specific utility functions"""
 # ----------------------------------------------------------------------------
 # pyglet
 # Copyright (c) 2006-2007 Alex Holkner

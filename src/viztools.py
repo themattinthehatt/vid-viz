@@ -1,6 +1,5 @@
-"""
-This file contains a library of simple image processing effects that can be 
-applied to source images or video
+"""Library of simple image processing effects that can be applied to source 
+images or video
 """
 
 from __future__ import print_function
@@ -11,30 +10,28 @@ import numpy as np
 
 import utils as util
 
-"""TODO
-- add print statements
-"""
 
-INF = 100000
+INF = 1000
 NONE = {
-    'DESC': '',
-    'NAME': '',
-    'VAL': 0,
-    'INIT': 0,
-    'MIN': 0,
-    'MAX': 1,
-    'MOD': INF,
-    'STEP': 1,
-    'INC': False,
-    'DEC': False}
+    'desc': '',
+    'name': '',
+    'val': 0,
+    'init': 0,
+    'min': 0,
+    'max': 1,
+    'mod': INF,
+    'step': 1,
+    'inc': False,
+    'dec': False}
 
 
 class Effect(object):
     """Base class for vid-viz effects"""
     def __init__(self):
         # set attributes common to all effects
-        self.PROPS = None
-        self.MAX_NUM_STYLES = 1
+        self.name = None
+        self.props = None
+        self.max_num_styles = 1
         self.auto_play = False
         self.style = 0
         self.reinitialize = False
@@ -43,51 +40,53 @@ class Effect(object):
         self.noise = util.SmoothNoise(
             num_samples=1,
             num_channels=self.chan_vec_pos.size)
+        self.update_output = False  # boolean for updating screen output
 
     def _process_io(self, key_list):
 
+        self.update_output = True
         if key_list[ord('-')]:
             key_list[ord('-')] = False
-            self.PROPS[0]['DEC'] = True
+            self.props[0]['dec'] = True
         elif key_list[ord('=')]:
             key_list[ord('=')] = False
-            self.PROPS[0]['INC'] = True
+            self.props[0]['inc'] = True
         elif key_list[ord('[')]:
             key_list[ord('[')] = False
-            self.PROPS[1]['DEC'] = True
+            self.props[1]['dec'] = True
         elif key_list[ord(']')]:
             key_list[ord(']')] = False
-            self.PROPS[1]['INC'] = True
+            self.props[1]['inc'] = True
         elif key_list[ord(';')]:
             key_list[ord(';')] = False
-            self.PROPS[2]['DEC'] = True
+            self.props[2]['dec'] = True
         elif key_list[ord('\'')]:
             key_list[ord('\'')] = False
-            self.PROPS[2]['INC'] = True
+            self.props[2]['inc'] = True
         elif key_list[ord(',')]:
             key_list[ord(',')] = False
-            self.PROPS[3]['DEC'] = True
+            self.props[3]['dec'] = True
         elif key_list[ord('.')]:
             key_list[ord('.')] = False
-            self.PROPS[3]['INC'] = True
+            self.props[3]['inc'] = True
         elif key_list[ord('R')]:
             key_list[ord('R')] = False
-            self.PROPS[4]['DEC'] = True
+            self.props[4]['dec'] = True
         elif key_list[ord('T')]:
             key_list[ord('T')] = False
-            self.PROPS[4]['INC'] = True
+            self.props[4]['inc'] = True
         elif key_list[ord('Q')]:
             key_list[ord('Q')] = False
-            self.PROPS[5]['DEC'] = True
+            self.props[5]['dec'] = True
         elif key_list[ord('S')]:
             key_list[ord('S')] = False
-            self.PROPS[5]['INC'] = True
+            self.props[5]['inc'] = True
         elif key_list[ord('/')]:
             key_list[ord('/')] = False
             self.reinitialize = True
         elif key_list[ord('t')]:
             key_list[ord('t')] = False
-            self.style = (self.style + 1) % self.MAX_NUM_STYLES
+            self.style = (self.style + 1) % self.max_num_styles
             # self.reinitialize = True
         elif key_list[ord('a')]:
             key_list[ord('a')] = False
@@ -97,29 +96,60 @@ class Effect(object):
             self.random_walk = not self.random_walk
             self.chan_vec_pos = np.zeros(self.chan_vec_pos.shape)
             self.noise.reinitialize()
+        else:
+            self.update_output = False
 
         # process options
-        for index, _ in enumerate(self.PROPS):
-            if self.PROPS[index]['DEC']:
-                self.PROPS[index]['DEC'] = False
-                self.PROPS[index]['VAL'] -= self.PROPS[index]['STEP']
-            if self.PROPS[index]['INC']:
-                self.PROPS[index]['INC'] = False
-                self.PROPS[index]['VAL'] += self.PROPS[index]['STEP']
-            self.PROPS[index]['VAL'] = np.mod(
-                self.PROPS[index]['VAL'],
-                self.PROPS[index]['MOD'])
-            self.PROPS[index]['VAL'] = np.clip(
-                self.PROPS[index]['VAL'],
-                self.PROPS[index]['MIN'],
-                self.PROPS[index]['MAX'])
+        for index, _ in enumerate(self.props):
+            if self.props[index]['dec']:
+                self.props[index]['dec'] = False
+                self.props[index]['val'] -= self.props[index]['step']
+            if self.props[index]['inc']:
+                self.props[index]['inc'] = False
+                self.props[index]['val'] += self.props[index]['step']
+            if self.props[index]['mod'] != INF:
+                self.props[index]['val'] = np.mod(
+                    self.props[index]['val'],
+                    self.props[index]['mod'])
+            self.props[index]['val'] = np.clip(
+                self.props[index]['val'],
+                self.props[index]['min'],
+                self.props[index]['max'])
 
     def process(self, frame, key_list):
         raise NotImplementedError
 
+    def print_update(self):
+        """Print effect settings to console"""
+        print()
+        print()
+        print()
+        print('%s effect settings' % self.name)
+        print('keys |  min  |  cur  |  max  |  description')
+        print('-----|-------|-------|-------|-------------')
+        for index in range(6):
+            if index == 0:
+                keys = '-/+'
+            elif index == 1:
+                keys = '{/}'
+            elif index == 2:
+                keys = ";/'"
+            elif index == 3:
+                keys = '</>'
+            elif index == 4:
+                keys = 'u/d'
+            elif index == 5:
+                keys = 'l/r'
+            print(' %s | %5g | %5g | %5g | %s' %
+                  (keys,
+                   self.props[index]['min'],
+                   self.props[index]['val'],
+                   self.props[index]['max'],
+                   self.props[index]['desc']))
+
     def reset(self):
-        for index, _ in enumerate(self.PROPS):
-            self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+        for index, _ in enumerate(self.props):
+            self.props[index]['val'] = self.props[index]['init']
         self.style = 0
         self.auto_play = False
         self.reinitialize = False
@@ -147,59 +177,64 @@ class Border(Effect):
 
         # user option constants
         MULT_FACTOR = {
-            'NAME': 'mult_factor',
-            'VAL': 1.0,
-            'INIT': 1.0,
-            'MIN': 0.01,
-            'MAX': 1.0,
-            'MOD': INF,
-            'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
+            'desc': 'mult_factor',
+            'name': 'mult_factor',
+            'val': 1.0,
+            'init': 1.0,
+            'min': 0.01,
+            'max': 1.0,
+            'mod': INF,
+            'step': 0.05,
+            'inc': False,
+            'dec': False}
         ZOOM_FACTOR = {
-            'NAME': 'zoom_factor',
-            'VAL': 1.0,
-            'INIT': 1.0,
-            'MIN': 1.0,
-            'MAX': 10.0,
-            'MOD': INF,
-            'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
+            'desc': 'zoom_factor',
+            'name': 'zoom_factor',
+            'val': 1.0,
+            'init': 1.0,
+            'min': 1.0,
+            'max': 10.0,
+            'mod': INF,
+            'step': 0.05,
+            'inc': False,
+            'dec': False}
         ROT_ANGLE = {
-            'NAME': 'rot_angle',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 360,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
+            'desc': 'rot_angle',
+            'name': 'rot_angle',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 360,
+            'step': 5,
+            'inc': False,
+            'dec': False}
         SHIFT_PIX_VERT = {
-            'NAME': 'shift_vert',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -500,
-            'MAX': 500,
-            'MOD': INF,
-            'STEP': 10,
-            'INC': False,
-            'DEC': False}
+            'desc': 'vertical shift',
+            'name': 'shift_vert',
+            'val': 0,
+            'init': 0,
+            'min': -500,
+            'max': 500,
+            'mod': INF,
+            'step': 10,
+            'inc': False,
+            'dec': False}
         SHIFT_PIX_HORZ = {
-            'NAME': 'shift_horz',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -500,
-            'MAX': 500,
-            'MOD': INF,
-            'STEP': 10,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 3
+            'desc': 'horizontal shift',
+            'name': 'shift_horz',
+            'val': 0,
+            'init': 0,
+            'min': -500,
+            'max': 500,
+            'mod': INF,
+            'step': 10,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             MULT_FACTOR,
             ZOOM_FACTOR,
             ROT_ANGLE,
@@ -224,15 +259,15 @@ class Border(Effect):
 
         if self.reinitialize:
             self.reinitialize = False
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        mult_factor = self.PROPS[0]['VAL']
-        zoom_factor = self.PROPS[1]['VAL']
-        rot_angle = self.PROPS[2]['VAL']
-        shift_vert = self.PROPS[4]['VAL']
-        shift_horz = self.PROPS[5]['VAL']
+        mult_factor = self.props[0]['val']
+        zoom_factor = self.props[1]['val']
+        rot_angle = self.props[2]['val']
+        shift_vert = self.props[4]['val']
+        shift_horz = self.props[5]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -322,31 +357,31 @@ class PostProcess(Effect):
         super(PostProcess, self).__init__()
 
         GAUSSIAN_KERN = {
-            'DESC': 'kernel size for gaussian smoothing',
-            'NAME': 'gauss_kern',
-            'VAL': 7,
-            'INIT': 7,
-            'MIN': 3,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for gaussian smoothing',
+            'name': 'gauss_kern',
+            'val': 7,
+            'init': 7,
+            'min': 3,
+            'max': 75,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         MEDIAN_KERN = {
-            'DESC': 'kernel size for median filtering',
-            'NAME': 'median_kern',
-            'VAL': 7,
-            'INIT': 7,
-            'MIN': 3,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 3
+            'desc': 'kernel size for median filtering',
+            'name': 'median_kern',
+            'val': 7,
+            'init': 7,
+            'min': 3,
+            'max': 75,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             GAUSSIAN_KERN,
             MEDIAN_KERN,
             NONE,
@@ -371,12 +406,12 @@ class PostProcess(Effect):
 
         if self.reinitialize:
             self.reinitialize = False
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        gauss_kern = self.PROPS[0]['VAL']
-        median_kern = self.PROPS[1]['VAL']
+        gauss_kern = self.props[0]['val']
+        median_kern = self.props[1]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -423,31 +458,31 @@ class Threshold(Effect):
 
         # user option constants
         THRESH_KERNEL = {
-            'DESC': 'kernel size for adaptive thresholding',
-            'NAME': 'kernel_size',
-            'VAL': 21,
-            'INIT': 21,
-            'MIN': 3,
-            'MAX': 71,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for adaptive thresholding',
+            'name': 'kernel_size',
+            'val': 21,
+            'init': 21,
+            'min': 3,
+            'max': 71,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         THRESH_OFFSET = {
-            'DESC': 'offset constant for adaptive thresholding',
-            'NAME': 'offset',
-            'VAL': 4,
-            'INIT': 4,
-            'MIN': 0,
-            'MAX': 30,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+            'desc': 'offset constant for adaptive thresholding',
+            'name': 'offset',
+            'val': 4,
+            'init': 4,
+            'min': 0,
+            'max': 30,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             THRESH_KERNEL,
             THRESH_OFFSET,
             NONE,
@@ -468,7 +503,7 @@ class Threshold(Effect):
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
-        self.MAX_NUM_CHAN_STYLES = 4
+        self.max_NUM_CHAN_STYLES = 4
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
@@ -499,16 +534,16 @@ class Threshold(Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        kernel_size = self.PROPS[0]['VAL']
-        offset = self.PROPS[1]['VAL']
+        kernel_size = self.props[0]['val']
+        offset = self.props[1]['val']
 
         for chan in range(3):
             if self.use_chan[chan]:
-                for chan_style in range(self.MAX_NUM_CHAN_STYLES):
+                for chan_style in range(self.max_NUM_CHAN_STYLES):
                     if key_list[ord(str(chan_style))]:
                         self.chan_style[chan] = chan_style
                         key_list[ord(str(chan_style))] = False
@@ -573,31 +608,31 @@ class Alien(Effect):
 
         # user option constants
         FREQ = {
-            'DESC': 'frequency of sine function',
-            'NAME': 'freq',
-            'VAL': 0.2,
-            'INIT': 0.2,
-            'MIN': 0.0,
-            'MAX': 10.0,
-            'MOD': INF,
-            'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
+            'desc': 'frequency of sine function',
+            'name': 'freq',
+            'val': 0.2,
+            'init': 0.2,
+            'min': 0.0,
+            'max': 10.0,
+            'mod': INF,
+            'step': 0.05,
+            'inc': False,
+            'dec': False}
         PHASE = {
-            'DESC': 'phase of sine function',
-            'NAME': 'phase',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 2 * np.pi,
-            'STEP': np.pi / 10.0,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+            'desc': 'phase of sine function',
+            'name': 'phase',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 2 * np.pi,
+            'step': np.pi / 10.0,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             FREQ,
             PHASE,
             NONE,
@@ -619,14 +654,14 @@ class Alien(Effect):
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
         self.chan_freq = [                      # current freq for each chan
-            self.PROPS[0]['INIT'],
-            self.PROPS[0]['INIT'],
-            self.PROPS[0]['INIT']]
+            self.props[0]['init'],
+            self.props[0]['init'],
+            self.props[0]['init']]
         self.chan_phase = [                     # current phase for each chan
-            self.PROPS[1]['INIT'],
-            self.PROPS[1]['INIT'],
-            self.PROPS[1]['INIT']]
-        self.MAX_NUM_CHAN_STYLES = 4
+            self.props[1]['init'],
+            self.props[1]['init'],
+            self.props[1]['init']]
+        self.max_NUM_CHAN_STYLES = 4
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -637,45 +672,45 @@ class Alien(Effect):
                 self.use_chan[0] = True
                 self.use_chan[1] = False
                 self.use_chan[2] = False
-                self.PROPS[0]['VAL'] = self.chan_freq[0]
-                self.PROPS[1]['VAL'] = self.chan_phase[0]
+                self.props[0]['val'] = self.chan_freq[0]
+                self.props[1]['val'] = self.chan_phase[0]
             elif key_list[ord('g')]:
                 key_list[ord('g')] = False
                 self.use_chan[0] = False
                 self.use_chan[1] = True
                 self.use_chan[2] = False
-                self.PROPS[0]['VAL'] = self.chan_freq[1]
-                self.PROPS[1]['VAL'] = self.chan_phase[1]
+                self.props[0]['val'] = self.chan_freq[1]
+                self.props[1]['val'] = self.chan_phase[1]
             elif key_list[ord('r')]:
                 key_list[ord('r')] = False
                 self.use_chan[0] = False
                 self.use_chan[1] = False
                 self.use_chan[2] = True
-                self.PROPS[0]['VAL'] = self.chan_freq[2]
-                self.PROPS[1]['VAL'] = self.chan_phase[2]
+                self.props[0]['val'] = self.chan_freq[2]
+                self.props[1]['val'] = self.chan_phase[2]
             self._process_io(key_list)
 
         # process options
         for chan in range(3):
             if self.use_chan[chan]:
                 # update channel style
-                for chan_style in range(self.MAX_NUM_CHAN_STYLES):
+                for chan_style in range(self.max_NUM_CHAN_STYLES):
                     if key_list[ord(str(chan_style))]:
                         self.chan_style[chan] = chan_style
                         key_list[ord(str(chan_style))] = False
                 # update channel params
-                self.chan_freq[chan] = self.PROPS[0]['VAL']
-                self.chan_phase[chan] = self.PROPS[1]['VAL']
+                self.chan_freq[chan] = self.props[0]['val']
+                self.chan_phase[chan] = self.props[1]['val']
 
         if self.reinitialize:
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
             for chan in range(3):
-                self.chan_freq[chan] = self.PROPS[0]['INIT']
-                self.chan_phase[chan] = self.PROPS[1]['INIT']
+                self.chan_freq[chan] = self.props[0]['init']
+                self.chan_phase[chan] = self.props[1]['init']
 
         # process image
         frame = cv2.GaussianBlur(frame, (11, 11), 0)
@@ -704,13 +739,13 @@ class Alien(Effect):
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]  # effect selector for each chan
         self.chan_freq = [  # current freq for each chan
-            self.PROPS[0]['INIT'],
-            self.PROPS[0]['INIT'],
-            self.PROPS[0]['INIT']]
+            self.props[0]['init'],
+            self.props[0]['init'],
+            self.props[0]['init']]
         self.chan_phase = [  # current phase for each chan
-            self.PROPS[1]['INIT'],
-            self.PROPS[1]['INIT'],
-            self.PROPS[1]['INIT']]
+            self.props[1]['init'],
+            self.props[1]['init'],
+            self.props[1]['init']]
 
 
 class RGBWalk(Effect):
@@ -735,25 +770,25 @@ class RGBWalk(Effect):
         self.name = 'rgb-walk'
 
         # user option constants
-        STEP_SIZE = {
-            'DESC': 'step size that scales random walk',
-            'NAME': 'step_size',
-            'VAL': 5.0,
-            'INIT': 5.0,
-            'MIN': 0.5,
-            'MAX': 15.0,
-            'MOD': INF,
-            'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+        step_SIZE = {
+            'desc': 'step size that scales random walk',
+            'name': 'step_size',
+            'val': 5.0,
+            'init': 5.0,
+            'min': 0.5,
+            'max': 15.0,
+            'mod': INF,
+            'step': 1.0,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             NONE,
             NONE,
             NONE,
-            STEP_SIZE,
+            step_SIZE,
             NONE,
             NONE]
 
@@ -778,7 +813,7 @@ class RGBWalk(Effect):
             self.noise.reinitialize()
 
         # human-readable names
-        step_size = self.PROPS[3]['VAL']
+        step_size = self.props[3]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -846,57 +881,57 @@ class RGBBurst(Effect):
 
         # user option constants
         FRAME_INT = {
-            'DESC': 'interval at which burst takes place',
-            'NAME': 'frame_interval',
-            'VAL': 10,
-            'INIT': 10,
-            'MIN': 1,
-            'MAX': 100,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
-        FRAME_DECAY = {
-            'DESC': 'decay rate for background frame luminance',
-            'NAME': 'frame_decay',
-            'VAL': 0.8,
-            'INIT': 0.8,
-            'MIN': 0.3,
-            'MAX': 0.99,
-            'MOD': INF,
-            'STEP': 0.01,
-            'INC': False,
-            'DEC': False}
+            'desc': 'interval at which burst takes place',
+            'name': 'frame_interval',
+            'val': 10,
+            'init': 10,
+            'min': 1,
+            'max': 100,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        FRAME_decAY = {
+            'desc': 'decay rate for background frame luminance',
+            'name': 'frame_decay',
+            'val': 0.8,
+            'init': 0.8,
+            'min': 0.3,
+            'max': 0.99,
+            'mod': INF,
+            'step': 0.01,
+            'inc': False,
+            'dec': False}
         EXP_RATE = {
-            'DESC': 'expansion rate of background frame',
-            'NAME': 'frame_expansion_rate',
-            'VAL': 1.1,
-            'INIT': 1.1,
-            'MIN': 1.01,
-            'MAX': 2.0,
-            'MOD': INF,
-            'STEP': 0.01,
-            'INC': False,
-            'DEC': False}
-        STEP_SIZE = {
-            'DESC': 'step size that scales random walk',
-            'NAME': 'step_size',
-            'VAL': 5.0,
-            'INIT': 5.0,
-            'MIN': 0.5,
-            'MAX': 15.0,
-            'MOD': INF,
-            'STEP': 1.0,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 3
+            'desc': 'expansion rate of background frame',
+            'name': 'frame_expansion_rate',
+            'val': 1.1,
+            'init': 1.1,
+            'min': 1.01,
+            'max': 2.0,
+            'mod': INF,
+            'step': 0.01,
+            'inc': False,
+            'dec': False}
+        step_SIZE = {
+            'desc': 'step size that scales random walk',
+            'name': 'step_size',
+            'val': 5.0,
+            'init': 5.0,
+            'min': 0.5,
+            'max': 15.0,
+            'mod': INF,
+            'step': 1.0,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             FRAME_INT,
-            FRAME_DECAY,
+            FRAME_decAY,
             EXP_RATE,
-            STEP_SIZE,
+            step_SIZE,
             NONE,
             NONE]
 
@@ -928,14 +963,14 @@ class RGBBurst(Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((3, 2))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        frame_interval = self.PROPS[0]['VAL']
-        frame_decay = self.PROPS[1]['VAL']
-        frame_expansion_rate = self.PROPS[2]['VAL']
-        step_size = self.PROPS[3]['VAL']
+        frame_interval = self.props[0]['val']
+        frame_decay = self.props[1]['val']
+        frame_expansion_rate = self.props[2]['val']
+        step_size = self.props[3]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -1057,42 +1092,42 @@ class HueBloom(Effect):
 
         # user option constants
         DIM_SIZE = {
-            'DESC': 'dimension of random matrix height/width',
-            'NAME': 'dim_size',
-            'VAL': 10,
-            'INIT': 10,
-            'MIN': 2,
-            'MAX': 100,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'dimension of random matrix height/width',
+            'name': 'dim_size',
+            'val': 10,
+            'init': 10,
+            'min': 2,
+            'max': 100,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         BLUR_KERNEL = {
-            'DESC': 'size of background blur kernel',
-            'NAME': 'blur_kernel',
-            'VAL': 3,
-            'INIT': 3,
-            'MIN': 3,
-            'MAX': 51,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'size of background blur kernel',
+            'name': 'blur_kernel',
+            'val': 3,
+            'init': 3,
+            'min': 3,
+            'max': 51,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         PULSE_FREQ = {
-            'DESC': 'frequency of blur_kernal sine modulator',
-            'NAME': 'pulse_freq',
-            'VAL': 0.1,
-            'INIT': 0.1,
-            'MIN': 0.05,
-            'MAX': 5,
-            'MOD': INF,
-            'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 3
+            'desc': 'frequency of blur_kernal sine modulator',
+            'name': 'pulse_freq',
+            'val': 0.1,
+            'init': 0.1,
+            'min': 0.05,
+            'max': 5,
+            'mod': INF,
+            'step': 0.05,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 3
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             DIM_SIZE,
             BLUR_KERNEL,
             PULSE_FREQ,
@@ -1111,11 +1146,11 @@ class HueBloom(Effect):
 
         # frame parameters
         self.frame_count = 0
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_dim_size = self.props[0]['init']
         self.frame = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+            (self.props[0]['init'], self.props[0]['init'], 3))
         self.frame[:, :, 0] = np.random.rand(
-            self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            self.props[0]['init'], self.props[0]['init'])
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -1127,19 +1162,19 @@ class HueBloom(Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((1, 1))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        dim_size = self.PROPS[0]['VAL']
-        blur_kernel = self.PROPS[1]['VAL']
-        pulse_freq = self.PROPS[2]['VAL']
+        dim_size = self.props[0]['val']
+        blur_kernel = self.props[1]['val']
+        pulse_freq = self.props[2]['val']
 
         # update blur kernel size
         val = 0.5 + 0.5 * np.sin(self.frame_count * pulse_freq)
         self.frame_count += 1
-        blur_kernel = int(val * (self.PROPS[1]['MAX'] - self.PROPS[1]['MIN']) +
-                          self.PROPS[1]['MIN'])
+        blur_kernel = int(val * (self.props[1]['max'] - self.props[1]['min']) +
+                          self.props[1]['min'])
 
         # make kernel odd-size
         if blur_kernel % 2 == 0:
@@ -1199,11 +1234,11 @@ class HueBloom(Effect):
     def reset(self):
         super(HueBloom, self).reset()
         self.frame_count = 0
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_dim_size = self.props[0]['init']
         self.frame = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+            (self.props[0]['init'], self.props[0]['init'], 3))
         self.frame[:, :, 0] = np.random.rand(
-            self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            self.props[0]['init'], self.props[0]['init'])
 
 
 class HueSwirl(Effect):
@@ -1238,74 +1273,75 @@ class HueSwirl(Effect):
 
         # user option constants
         DIM_SIZE = {
-            'DESC': 'dimension of background random matrix height/width',
-            'NAME': 'dim_size',
-            'VAL': 2,
-            'INIT': 2,
-            'MIN': 2,
-            'MAX': 100,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'dimension of background random matrix height/width',
+            'name': 'dim_size',
+            'val': 1,
+            'init': 1,
+            'min': 1,
+            'max': 100,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         BACKGROUND_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gaussian blur that produces bloom',
-            'NAME': 'back_blur',
-            'VAL': 19,
-            'INIT': 19,
-            'MIN': 3,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gaussian blur that produces bloom',
+            'name': 'back_blur',
+            'val': 19,
+            'init': 19,
+            'min': 3,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         MASK_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gauss/med blur that acts on mask',
-            'NAME': 'mask_blur',
-            'VAL': 5,
-            'INIT': 5,
-            'MIN': 5,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gauss/med blur that acts on mask',
+            'name': 'mask_blur',
+            'val': 5,
+            'init': 5,
+            'min': 5,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         ITER_INDEX = {
-            'DESC': 'index into blurring iterations',
-            'NAME': 'iter_index',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
+            'desc': 'index into blurring iterations',
+            'name': 'iter_index',
+            'val': 0,
+            'init': 0,
+            'min': 0,
+            'max': 75,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         FINAL_MASK_OFFSET = {
-            'DESC': 'mask is subtracted from this value before final masking',
-            'NAME': 'mask_offset',
-            'VAL': 255,
-            'INIT': 255,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 255,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
+            'desc': 'mask is subtracted from this value before final masking',
+            'name': 'mask_offset',
+            'val': 255,
+            'init': 255,
+            'min': -INF,
+            'max': INF,
+            'mod': 255,
+            'step': 5,
+            'inc': False,
+            'dec': False}
         HUE_OFFSET = {
-            'NAME': 'hue value offset for background frame',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 180,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+            'desc': 'hue value offset for background frame',
+            'name': 'hue_offset',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 180,
+            'step': 5,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             DIM_SIZE,
             BACKGROUND_BLUR_KERNEL,
             MASK_BLUR_KERNEL,
@@ -1325,15 +1361,15 @@ class HueSwirl(Effect):
 
         # frame parameters
         self.prev_mask_blur = 0  # to initialize frame_mask_list
-        self.prev_hue_offset = self.PROPS[5]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_hue_offset = self.props[5]['init']
+        self.prev_dim_size = self.props[0]['init']
         self.frame_back_0 = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+            (self.props[0]['init'], self.props[0]['init'], 3))
         self.frame_back_0[:, :, 0] = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            np.random.rand(self.props[0]['init'], self.props[0]['init'])
         self.frame_back = None
         self.frame_mask_list = [None for _ in
-                                range(self.PROPS[4]['MAX'] + 1)]
+                                range(self.props[4]['max'] + 1)]
         self.frame_mask = None
 
         # control parameters
@@ -1356,41 +1392,41 @@ class HueSwirl(Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((1, 1))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
             self.frame_mask_list = \
-                [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+                [None for _ in range(self.props[4]['max'] + 1)]
             self.increase_index = True
             self.increase_meta_index = True
 
         # control parameters
         if self.auto_play:
             if self.increase_index:
-                self.PROPS[4]['VAL'] += 1
+                self.props[4]['val'] += 1
             else:
-                self.PROPS[4]['VAL'] -= 1
-            if self.PROPS[4]['VAL'] == self.PROPS[4]['MAX']:
+                self.props[4]['val'] -= 1
+            if self.props[4]['val'] == self.props[4]['max']:
                 self.increase_index = False
-            if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
+            if self.props[4]['val'] == self.props[4]['min']:
                 self.increase_index = True
                 # change meta index
                 if self.increase_meta_index:
-                    self.PROPS[2]['VAL'] += self.PROPS[2]['STEP']
+                    self.props[2]['val'] += self.props[2]['step']
                 else:
-                    self.PROPS[2]['VAL'] -= self.PROPS[2]['STEP']
-                if self.PROPS[2]['VAL'] == self.PROPS[2]['MAX']:
+                    self.props[2]['val'] -= self.props[2]['step']
+                if self.props[2]['val'] == self.props[2]['max']:
                     self.increase_meta_index = False
-                if self.PROPS[2]['VAL'] == self.PROPS[2]['MIN']:
+                if self.props[2]['val'] == self.props[2]['min']:
                     self.increase_meta_index = True
-                    self.style = (self.style + 1) % self.MAX_NUM_STYLES
+                    self.style = (self.style + 1) % self.max_num_styles
 
         # human-readable names
-        dim_size = self.PROPS[0]['VAL']
-        back_blur = self.PROPS[1]['VAL']
-        mask_blur = self.PROPS[2]['VAL']
-        final_offset = self.PROPS[3]['VAL']
-        iter_index = self.PROPS[4]['VAL']
-        hue_offset = self.PROPS[5]['VAL']
+        dim_size = self.props[0]['val']
+        back_blur = self.props[1]['val']
+        mask_blur = self.props[2]['val']
+        final_offset = self.props[3]['val']
+        iter_index = self.props[4]['val']
+        hue_offset = self.props[5]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -1435,11 +1471,11 @@ class HueSwirl(Effect):
         if int(mask_blur) is not int(
                 self.prev_mask_blur) or reset_iter_seq:
             # blur kernel changed; restart iteration sequence
-            self.PROPS[4]['VAL'] = self.PROPS[4]['INIT']
-            iter_index = self.PROPS[4]['VAL']
+            self.props[4]['val'] = self.props[4]['init']
+            iter_index = self.props[4]['val']
             self.increase_index = True
             self.frame_mask_list = \
-                [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+                [None for _ in range(self.props[4]['max'] + 1)]
             # get new mask
             self.frame_mask = 255 - cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if self.style == 0:
@@ -1517,13 +1553,13 @@ class HueSwirl(Effect):
         self.auto_play = True
         # frame parameters
         self.prev_mask_blur = 0  # to initialize frame_mask_list
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_dim_size = self.props[0]['init']
         self.frame_back_0 = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+            (self.props[0]['init'], self.props[0]['init'], 3))
         self.frame_back_0[:, :, 0] = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            np.random.rand(self.props[0]['init'], self.props[0]['init'])
         self.frame_back = None
-        self.frame_mask_list = [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+        self.frame_mask_list = [None for _ in range(self.props[4]['max'] + 1)]
         self.frame_mask = None
         # control parameters
         self.increase_index = True
@@ -1556,74 +1592,75 @@ class HueSwirlMover(Effect):
 
         # user option constants
         DIM_SIZE = {
-            'DESC': 'dimension of background random matrix height/width',
-            'NAME': 'dim_size',
-            'VAL': 2,
-            'INIT': 2,
-            'MIN': 2,
-            'MAX': 100,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'dimension of background random matrix height/width',
+            'name': 'dim_size',
+            'val': 2,
+            'init': 2,
+            'min': 2,
+            'max': 100,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         BACKGROUND_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gaussian blur that produces bloom',
-            'NAME': 'back_blur',
-            'VAL': 19,
-            'INIT': 19,
-            'MIN': 3,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gaussian blur that produces bloom',
+            'name': 'back_blur',
+            'val': 19,
+            'init': 19,
+            'min': 3,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         MASK_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gauss/med blur that acts on mask',
-            'NAME': 'mask_blur',
-            'VAL': 5,
-            'INIT': 5,
-            'MIN': 5,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gauss/med blur that acts on mask',
+            'name': 'mask_blur',
+            'val': 5,
+            'init': 5,
+            'min': 5,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         ITER_INDEX = {
-            'DESC': 'index into blurring iterations',
-            'NAME': 'iter_index',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
+            'desc': 'index into blurring iterations',
+            'name': 'iter_index',
+            'val': 0,
+            'init': 0,
+            'min': 0,
+            'max': 75,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         BLEND_PROP = {
-            'DESC': 'modulates weighting between new and previous frame',
-            'NAME': 'blend_prop',
-            'VAL': 0.5,
-            'INIT': 0.5,
-            'MIN': 0.05,
-            'MAX': 1.0,
-            'MOD': INF,
-            'STEP': 0.05,
-            'INC': False,
-            'DEC': False}
+            'desc': 'modulates weighting between new and previous frame',
+            'name': 'blend_prop',
+            'val': 0.5,
+            'init': 0.5,
+            'min': 0.05,
+            'max': 1.0,
+            'mod': INF,
+            'step': 0.05,
+            'inc': False,
+            'dec': False}
         HUE_OFFSET = {
-            'NAME': 'hue value offset for background frame',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 180,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+            'desc': 'hue value offset for background frame',
+            'name': 'hue_offset',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 180,
+            'step': 5,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             DIM_SIZE,
             BACKGROUND_BLUR_KERNEL,
             MASK_BLUR_KERNEL,
@@ -1642,10 +1679,10 @@ class HueSwirlMover(Effect):
             num_channels=self.chan_vec_pos.size)
 
         # frame parameters
-        self.prev_hue_offset = self.PROPS[5]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_hue_offset = self.props[5]['init']
+        self.prev_dim_size = self.props[0]['init']
         self.frame_back_0 = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            np.random.rand(self.props[0]['init'], self.props[0]['init'])
         self.frame_back = None
         self.frame_mask_blurred = None
 
@@ -1659,15 +1696,15 @@ class HueSwirlMover(Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((1, 1))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        dim_size = self.PROPS[0]['VAL']
-        back_blur = self.PROPS[1]['VAL']
-        mask_blur = self.PROPS[2]['VAL']
-        blend_prop = self.PROPS[3]['VAL']
-        hue_offset = self.PROPS[5]['VAL']
+        dim_size = self.props[0]['val']
+        back_blur = self.props[1]['val']
+        mask_blur = self.props[2]['val']
+        blend_prop = self.props[3]['val']
+        hue_offset = self.props[5]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -1797,10 +1834,10 @@ class HueSwirlMover(Effect):
         super(HueSwirlMover, self).reset()
         self.auto_play = False
         # frame parameters
-        self.prev_hue_offset = self.PROPS[5]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_hue_offset = self.props[5]['init']
+        self.prev_dim_size = self.props[0]['init']
         self.frame_back_0 = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            np.random.rand(self.props[0]['init'], self.props[0]['init'])
         self.frame_back = None
         self.frame_mask_blurred = None
 
@@ -1830,42 +1867,42 @@ class HueCrusher(Effect):
 
         # user option constants
         NUM_CHUNKS = {
-            'DESC': 'number of chunks that divide huespace',
-            'NAME': 'num_chunks',
-            'VAL': 3,
-            'INIT': 3,
-            'MIN': 1,
-            'MAX': 10,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
+            'desc': 'number of chunks that divide huespace',
+            'name': 'num_chunks',
+            'val': 3,
+            'init': 3,
+            'min': 1,
+            'max': 10,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         CENTER_OFFSET = {
-            'DESC': 'offset value to apply to chunk centers',
-            'NAME': 'center_offset',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 255,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
+            'desc': 'offset value to apply to chunk centers',
+            'name': 'center_offset',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 255,
+            'step': 5,
+            'inc': False,
+            'dec': False}
         CHUNK_WIDTH = {
-            'DESC': 'width of each chunk in huespace',
-            'NAME': 'chunk_width',
-            'VAL': 16,
-            'INIT': 16,
-            'MIN': 3,
-            'MAX': 180,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 1
+            'desc': 'width of each chunk in huespace',
+            'name': 'chunk_width',
+            'val': 16,
+            'init': 16,
+            'min': 3,
+            'max': 180,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 1
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             NUM_CHUNKS,
             CENTER_OFFSET,
             CHUNK_WIDTH,
@@ -1883,7 +1920,7 @@ class HueCrusher(Effect):
             num_channels=self.chan_vec_pos.size)
 
         # chunk params
-        num_chunks = self.PROPS[0]['INIT']
+        num_chunks = self.props[0]['init']
         self.num_chunks_prev = num_chunks
 
         self.chunk_widths_og = int(180 / num_chunks)
@@ -1906,19 +1943,19 @@ class HueCrusher(Effect):
             self._process_io(key_list)
 
         # # mod out offset so it can circle around hue-space
-        # self.PROPS[1]['VAL'] = self.PROPS[1]['VAL'] % 180
+        # self.props[1]['val'] = self.props[1]['val'] % 180
 
         if self.reinitialize:
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((1, 1))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        num_chunks = self.PROPS[0]['VAL']
-        center_offset = self.PROPS[1]['VAL']
-        chunk_width = self.PROPS[2]['VAL']
+        num_chunks = self.props[0]['val']
+        center_offset = self.props[1]['val']
+        chunk_width = self.props[2]['val']
 
         # process image
         if len(frame.shape) == 3:
@@ -1979,7 +2016,7 @@ class HueCrusher(Effect):
     def reset(self):
         super(HueCrusher, self).reset()
         # chunk params
-        num_chunks = self.PROPS[0]['INIT']
+        num_chunks = self.props[0]['init']
         self.num_chunks_prev = num_chunks
         self.chunk_widths_og = int(180 / num_chunks)
         self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
