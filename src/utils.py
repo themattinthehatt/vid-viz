@@ -45,9 +45,9 @@ class SmoothNoise(object):
 def get_sources():
     # file_type options : 'cam' | 'video' | 'image' | 'auto'
     source_list = []
-    # source_list.append({
-    #     'file_loc': 'hueswirlchain',
-    #     'file_type': 'auto'})
+    source_list.append({
+        'file_loc': 'hueswirlchain',
+        'file_type': 'auto'})
     # source_list.append({
     #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/snowflake-02.mp4',
     #     'file_type': 'video'})
@@ -58,7 +58,7 @@ def get_sources():
         'file_loc': '/media/data/Dropbox/Git/vid-viz/data/honeycomb-00.jpg',
         'file_type': 'image'})
     source_list.append({
-        'file_loc': None,
+        'file_loc': 'webcam',
         'file_type': 'cam'})
     # source_list.append({
     #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-00.jpg',

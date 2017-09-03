@@ -13,7 +13,7 @@ import utils as util
 
 INF = 1000
 NONE = {
-    'desc': '',
+    'desc': 'unassigned',
     'name': '',
     'val': 0,
     'init': 0,
@@ -44,43 +44,55 @@ class Effect(object):
 
     def _process_io(self, key_list):
 
-        self.update_output = True
+        self.update_output = -1
         if key_list[ord('-')]:
             key_list[ord('-')] = False
             self.props[0]['dec'] = True
+            self.update_output = 0
         elif key_list[ord('=')]:
             key_list[ord('=')] = False
             self.props[0]['inc'] = True
+            self.update_output = 0
         elif key_list[ord('[')]:
             key_list[ord('[')] = False
             self.props[1]['dec'] = True
+            self.update_output = 1
         elif key_list[ord(']')]:
             key_list[ord(']')] = False
             self.props[1]['inc'] = True
+            self.update_output = 1
         elif key_list[ord(';')]:
             key_list[ord(';')] = False
             self.props[2]['dec'] = True
+            self.update_output = 2
         elif key_list[ord('\'')]:
             key_list[ord('\'')] = False
             self.props[2]['inc'] = True
+            self.update_output = 2
         elif key_list[ord(',')]:
             key_list[ord(',')] = False
             self.props[3]['dec'] = True
+            self.update_output = 3
         elif key_list[ord('.')]:
             key_list[ord('.')] = False
             self.props[3]['inc'] = True
+            self.update_output = 3
         elif key_list[ord('R')]:
             key_list[ord('R')] = False
             self.props[4]['dec'] = True
+            self.update_output = 4
         elif key_list[ord('T')]:
             key_list[ord('T')] = False
             self.props[4]['inc'] = True
+            self.update_output = 4
         elif key_list[ord('Q')]:
             key_list[ord('Q')] = False
             self.props[5]['dec'] = True
+            self.update_output = 5
         elif key_list[ord('S')]:
             key_list[ord('S')] = False
             self.props[5]['inc'] = True
+            self.update_output = 5
         elif key_list[ord('/')]:
             key_list[ord('/')] = False
             self.reinitialize = True
@@ -96,8 +108,6 @@ class Effect(object):
             self.random_walk = not self.random_walk
             self.chan_vec_pos = np.zeros(self.chan_vec_pos.shape)
             self.noise.reinitialize()
-        else:
-            self.update_output = False
 
         # process options
         for index, _ in enumerate(self.props):

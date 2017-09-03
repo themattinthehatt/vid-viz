@@ -116,6 +116,8 @@ class WindowServer(object):
                 if source_loc is 'hueswirlchain':
                     self.auto_effect = auto.HueSwirlChain(
                         self.window_width, self.window_height)
+                    self.auto_effect.update_output = 1  # force output
+                    self.auto_effect.print_update()
                 else:
                     print('Invalid auto effect')
                     self.total_frame_count = float('inf')
@@ -130,6 +132,7 @@ class WindowServer(object):
             # frame = self.frame_orig
         elif self.source_type is 'auto':
             frame = self.auto_effect.process(self.key_list)
+            self.auto_effect.print_update()
 
         if self.source_type is not 'auto':
             if frame is None:
@@ -163,7 +166,7 @@ class WindowServer(object):
                 frame = self.effects[self.effect_index].process(
                     frame, self.key_list)
                 # output info
-                if self.effects[self.effect_index].update_output:
+                if self.effects[self.effect_index].update_output > -1:
                     self.effects[self.effect_index].print_update()
 
         # apply borders after effect

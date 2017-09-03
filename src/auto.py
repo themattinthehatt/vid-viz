@@ -13,19 +13,20 @@ import numpy as np
 
 import viztools as vv
 import utils as util
+import cvutils as cvutil
 
-INF = 100000
+INF = 1000
 NONE = {
-    'DESC': '',
-    'NAME': '',
-    'VAL': 0,
-    'INIT': 0,
-    'MIN': 0,
-    'MAX': 1,
-    'MOD': INF,
-    'STEP': 1,
-    'INC': False,
-    'DEC': False}
+    'desc': 'unassigned',
+    'name': '',
+    'val': 0,
+    'init': 0,
+    'min': 0,
+    'max': 1,
+    'mod': INF,
+    'step': 1,
+    'inc': False,
+    'dec': False}
 
 
 class HueSwirlChain(vv.Effect):
@@ -54,74 +55,76 @@ class HueSwirlChain(vv.Effect):
 
         # user option constants
         DIM_SIZE = {
-            'DESC': 'dimension of background random matrix height/width',
-            'NAME': 'dim_size',
-            'VAL': 1,
-            'INIT': 1,
-            'MIN': 1,
-            'MAX': 100,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
+            'desc': 'dimension of background random matrix height/width',
+            'name': 'dim_size',
+            'val': 1,
+            'init': 1,
+            'min': 1,
+            'max': 100,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         BACKGROUND_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gaussian blur that produces bloom',
-            'NAME': 'back_blur',
-            'VAL': 19,
-            'INIT': 19,
-            'MIN': 3,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gaussian blur that produces bloom',
+            'name': 'back_blur',
+            'val': 19,
+            'init': 19,
+            'min': 3,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         MASK_BLUR_KERNEL = {
-            'DESC': 'kernel size for Gauss/med blur that acts on mask',
-            'NAME': 'mask_blur',
-            'VAL': 5,
-            'INIT': 5,
-            'MIN': 5,
-            'MAX': 31,
-            'MOD': INF,
-            'STEP': 2,
-            'INC': False,
-            'DEC': False}
-        ITER_INDEX = {
-            'DESC': 'index into blurring iterations',
-            'NAME': 'iter_index',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': 0,
-            'MAX': 75,
-            'MOD': INF,
-            'STEP': 1,
-            'INC': False,
-            'DEC': False}
+            'desc': 'kernel size for Gauss/med blur that acts on mask',
+            'name': 'mask_blur',
+            'val': 5,
+            'init': 5,
+            'min': 5,
+            'max': 31,
+            'mod': INF,
+            'step': 2,
+            'inc': False,
+            'dec': False}
         FINAL_MASK_OFFSET = {
-            'DESC': 'mask is subtracted from this value before final masking',
-            'NAME': 'mask_offset',
-            'VAL': 255,
-            'INIT': 255,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 256,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
+            'desc': 'mask is subtracted from this value before final masking',
+            'name': 'mask_offset',
+            'val': 235,
+            'init': 235,
+            'min': -INF,
+            'max': INF,
+            'mod': 256,
+            'step': 5,
+            'inc': False,
+            'dec': False}
+        ITER_INDEX = {
+            'desc': '(no user input) index into blurring iterations',
+            'name': 'iter_index',
+            'val': 0,
+            'init': 0,
+            'min': 0,
+            'max': 75,
+            'mod': INF,
+            'step': 1,
+            'inc': False,
+            'dec': False}
         HUE_OFFSET = {
-            'NAME': 'hue value offset for background frame',
-            'VAL': 0,
-            'INIT': 0,
-            'MIN': -INF,
-            'MAX': INF,
-            'MOD': 180,
-            'STEP': 5,
-            'INC': False,
-            'DEC': False}
-        self.MAX_NUM_STYLES = 2
+            'desc': '(no user input) ' +
+                    'hue value offset for background frame',
+            'name': 'hue_offset',
+            'val': 0,
+            'init': 0,
+            'min': -INF,
+            'max': INF,
+            'mod': 180,
+            'step': 5,
+            'inc': False,
+            'dec': False}
+        self.max_NUM_STYLES = 2
 
         # combine dicts into a list for easy general access
-        self.PROPS = [
+        self.props = [
             DIM_SIZE,
             BACKGROUND_BLUR_KERNEL,
             MASK_BLUR_KERNEL,
@@ -156,33 +159,34 @@ class HueSwirlChain(vv.Effect):
         # reset base class attributes
         super(HueSwirlChain, self).reset()
         self.prev_mask_blur = 0  # to initialize frame_mask_list
-        self.prev_hue_offset = self.PROPS[5]['INIT']
-        self.prev_dim_size = self.PROPS[0]['INIT']
+        self.prev_hue_offset = self.props[5]['init']
+        self.prev_dim_size = self.props[0]['init']
 
         # background frame parameters
         self.frame_back_0 = np.ones(
-            (self.PROPS[0]['INIT'], self.PROPS[0]['INIT'], 3))
+            (self.props[0]['init'], self.props[0]['init'], 3))
         self.frame_back_0[:, :, 0] = \
-            np.random.rand(self.PROPS[0]['INIT'], self.PROPS[0]['INIT'])
+            np.random.rand(self.props[0]['init'], self.props[0]['init'])
         self.frame_back = None
+        self.auto_play = True
 
         # frame parameters
         self.curr_frame_index = 0
         self.file_index = 0
         frame_0 = cv2.imread(self.file_list[self.file_index])
-        frame_0 = util.resize(frame_0, self.frame_width, self.frame_height)
+        frame_0 = cvutil.resize(frame_0, self.frame_width, self.frame_height)
         self.file_index += 1
         frame_1 = cv2.imread(self.file_list[self.file_index])
-        frame_1 = util.resize(frame_1, self.frame_width, self.frame_height)
+        frame_1 = cvutil.resize(frame_1, self.frame_width, self.frame_height)
         self.file_index += 1
         self.frame = [frame_0, frame_1]
 
         # mask parameters
         self.frame_masks = [None, None]
         self.frame_mask_list = [
-            [None for _ in range(self.PROPS[4]['MAX'] + 1)],
-            [None for _ in range(self.PROPS[4]['MAX'] + 1)]]
-        self.num_blend_levels = self.PROPS[4]['MAX']
+            [None for _ in range(self.props[4]['max'] + 1)],
+            [None for _ in range(self.props[4]['max'] + 1)]]
+        self.num_blend_levels = self.props[4]['max']
         self.curr_blend_level = 0
 
         # control parameters
@@ -200,8 +204,8 @@ class HueSwirlChain(vv.Effect):
 
         # control parameters (use _process_io for clipping and modding)
         if self.auto_play:
-            # self.PROPS[3]['VAL'] += 1  # final mask offset
-            self.PROPS[5]['VAL'] += 0.1  # hue offset
+            # self.props[3]['val'] += 1  # final mask offset
+            self.props[5]['val'] += 0.1  # hue offset
 
         # process keyboard input
         if not key_lock:
@@ -212,10 +216,10 @@ class HueSwirlChain(vv.Effect):
             self.reinitialize = False
             self.chan_vec_pos = np.zeros((1, 1))
             self.noise.reinitialize()
-            for index, _ in enumerate(self.PROPS):
-                self.PROPS[index]['VAL'] = self.PROPS[index]['INIT']
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
             self.frame_mask_list = \
-                [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+                [None for _ in range(self.props[4]['max'] + 1)]
             self.increase_index = True
             self.increase_meta_index = True
 
@@ -237,12 +241,12 @@ class HueSwirlChain(vv.Effect):
 
         # control parameters - blur
         if self.increase_blur_index:
-            self.PROPS[4]['VAL'] += 1
+            self.props[4]['val'] += 1
         else:
-            self.PROPS[4]['VAL'] -= 1
-        if self.PROPS[4]['VAL'] == self.PROPS[4]['MAX']:
+            self.props[4]['val'] -= 1
+        if self.props[4]['val'] == self.props[4]['max']:
             self.increase_blur_index = False
-        if self.PROPS[4]['VAL'] == self.PROPS[4]['MIN']:
+        if self.props[4]['val'] == self.props[4]['min']:
             self.increase_blur_index = True
             reset_iter_seq = True
         else:
@@ -252,7 +256,7 @@ class HueSwirlChain(vv.Effect):
         if reset_iter_seq:
             # reset part of mask list so new image can take over
             self.frame_mask_list[self.curr_frame_index] = \
-                [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+                [None for _ in range(self.props[4]['max'] + 1)]
             # load new image
             temp_frame = cv2.imread(self.file_list[self.file_index])
             hw = temp_frame.shape
@@ -262,7 +266,7 @@ class HueSwirlChain(vv.Effect):
                 (hw[1]/2, hw[0]/2))
             self.frame[self.curr_frame_index] = temp_frame
 
-            self.frame[self.curr_frame_index] = util.resize(
+            self.frame[self.curr_frame_index] = cvutil.resize(
                 self.frame[self.curr_frame_index],
                 self.frame_width,
                 self.frame_height)
@@ -273,12 +277,12 @@ class HueSwirlChain(vv.Effect):
             self.curr_blend_level = 0
 
         # human-readable names
-        dim_size = self.PROPS[0]['VAL']
-        back_blur = self.PROPS[1]['VAL']
-        mask_blur = self.PROPS[2]['VAL']
-        final_offset = self.PROPS[3]['VAL']
-        iter_index = self.PROPS[4]['VAL']
-        hue_offset = self.PROPS[5]['VAL']
+        dim_size = self.props[0]['val']
+        back_blur = self.props[1]['val']
+        mask_blur = self.props[2]['val']
+        final_offset = self.props[3]['val']
+        iter_index = self.props[4]['val']
+        hue_offset = self.props[5]['val']
         curr_fr_indx = self.curr_frame_index
         next_fr_indx = (curr_fr_indx + 1) % 2
 
@@ -316,11 +320,11 @@ class HueSwirlChain(vv.Effect):
         if int(mask_blur) is not int(
                 self.prev_mask_blur) or reset_iter_seq:
             # blur kernel changed; restart iteration sequence
-            # self.PROPS[4]['VAL'] = self.PROPS[4]['INIT']
-            # iter_index = self.PROPS[4]['VAL']
+            # self.props[4]['val'] = self.props[4]['init']
+            # iter_index = self.props[4]['val']
             # self.increase_index = True
             # self.frame_mask_list = \
-            #     [None for _ in range(self.PROPS[4]['MAX'] + 1)]
+            #     [None for _ in range(self.props[4]['max'] + 1)]
             # get new mask
 
             frame_gray = cv2.cvtColor(
@@ -422,3 +426,9 @@ class HueSwirlChain(vv.Effect):
 
         # _, frame = cv2.threshold(frame, 32, 255, cv2.THRESH_BINARY)
         return frame
+
+    def print_update(self):
+        """Print effect settings to console if not changed automatically"""
+        if (self.update_output != -1) & (self.update_output != 4) & (
+                self.update_output != 5):
+            super(HueSwirlChain, self).print_update()
