@@ -129,33 +129,43 @@ class Effect(object):
     def process(self, frame, key_list):
         raise NotImplementedError
 
-    def print_update(self):
+    def print_update(self, force=False):
         """Print effect settings to console"""
-        print()
-        print()
-        print()
-        print('%s effect settings' % self.name)
-        print('keys |  min  |  cur  |  max  |  description')
-        print('-----|-------|-------|-------|-------------')
-        for index in range(6):
-            if index == 0:
-                keys = '-/+'
-            elif index == 1:
-                keys = '{/}'
-            elif index == 2:
-                keys = ";/'"
-            elif index == 3:
-                keys = '</>'
-            elif index == 4:
-                keys = 'u/d'
-            elif index == 5:
-                keys = 'l/r'
-            print(' %s | %5g | %5g | %5g | %s' %
-                  (keys,
-                   self.props[index]['min'],
-                   self.props[index]['val'],
-                   self.props[index]['max'],
-                   self.props[index]['desc']))
+        if self.update_output > -1 or force:
+            print()
+            print()
+            print()
+            print('%s effect settings' % self.name)
+            print('keys |  min  |  cur  |  max  |  description')
+            print('-----|-------|-------|-------|-------------')
+            for index in range(6):
+                if index == 0:
+                    keys = '-/+'
+                elif index == 1:
+                    keys = '{/}'
+                elif index == 2:
+                    keys = ";/'"
+                elif index == 3:
+                    keys = '</>'
+                elif index == 4:
+                    keys = 'u/d'
+                elif index == 5:
+                    keys = 'l/r'
+                print(' %s | %5g | %5g | %5g | %s' %
+                      (keys,
+                       self.props[index]['min'],
+                       self.props[index]['val'],
+                       self.props[index]['max'],
+                       self.props[index]['desc']))
+            self.print_extra_updates()
+
+    def print_extra_updates(self):
+        print('t - toggle between effect types')
+        print('w - toggle random walk')
+        print('/ - reset effect parameters')
+        print('q - quit %s effect' % self.name)
+        print('~ - enable border effects')
+        print('spacebar - cycle through sources')
 
     def reset(self):
         for index, _ in enumerate(self.props):
@@ -178,16 +188,18 @@ class Border(Effect):
         ;/' - rotate image left/right
         ,/. - None
         lrud arrows - translate image
+        / - reset parameters
         backspace - quit border effect
     """
 
     def __init__(self):
 
         super(Border, self).__init__()
+        self.name = 'border'
 
         # user option constants
         MULT_FACTOR = {
-            'desc': 'mult_factor',
+            'desc': 'shrink frame and fill border',
             'name': 'mult_factor',
             'val': 1.0,
             'init': 1.0,
@@ -198,7 +210,7 @@ class Border(Effect):
             'inc': False,
             'dec': False}
         ZOOM_FACTOR = {
-            'desc': 'zoom_factor',
+            'desc': 'zoom on original frame',
             'name': 'zoom_factor',
             'val': 1.0,
             'init': 1.0,
@@ -209,7 +221,7 @@ class Border(Effect):
             'inc': False,
             'dec': False}
         ROT_ANGLE = {
-            'desc': 'rot_angle',
+            'desc': 'rotation on original frame',
             'name': 'rot_angle',
             'val': 0,
             'init': 0,
@@ -220,7 +232,7 @@ class Border(Effect):
             'inc': False,
             'dec': False}
         SHIFT_PIX_VERT = {
-            'desc': 'vertical shift',
+            'desc': 'vertical shift on original frame',
             'name': 'shift_vert',
             'val': 0,
             'init': 0,
@@ -231,7 +243,7 @@ class Border(Effect):
             'inc': False,
             'dec': False}
         SHIFT_PIX_HORZ = {
-            'desc': 'horizontal shift',
+            'desc': 'horizontal shift on original frame',
             'name': 'shift_horz',
             'val': 0,
             'init': 0,
@@ -348,6 +360,12 @@ class Border(Effect):
                     cv2.BORDER_REFLECT)
 
         return frame
+
+    def print_extra_updates(self):
+        print('t - toggle between border styles')
+        print('tab - reverse processing/bordering order')
+        print('/ - reset border parameters')
+        print('backspace - quit editing border effects')
 
 
 class PostProcess(Effect):

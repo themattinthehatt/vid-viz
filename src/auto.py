@@ -52,6 +52,7 @@ class HueSwirlChain(vv.Effect):
     def __init__(self, frame_width, frame_height):
 
         super(HueSwirlChain, self).__init__()
+        self.name = 'hue-swirl-chain'
 
         # user option constants
         DIM_SIZE = {
@@ -429,6 +430,10 @@ class HueSwirlChain(vv.Effect):
 
     def print_update(self):
         """Print effect settings to console if not changed automatically"""
-        if (self.update_output != -1) & (self.update_output != 4) & (
-                self.update_output != 5):
+        if (self.update_output != 4) and (self.update_output != 5):
             super(HueSwirlChain, self).print_update()
+
+    def print_extra_updates(self):
+        print('q - quit %s effect' % self.name)
+        print('~ - enable border effects')
+        print('spacebar - cycle through sources')

@@ -69,8 +69,14 @@ class WindowServer(object):
             self.effect_index = None
         elif self.key_list[ord('\b')]:
             self.post_process = False
+            if self.effect_index is not None:
+                self.effects[self.effect_index].print_update(force=True)
+            else:
+                print('')
+                print('')
         elif self.key_list[ord('`')]:
             self.post_process = True
+            self.border.print_update(force=True)
         elif self.key_list[ord(' ')]:
             self.source_index = (self.source_index + 1) % self.num_sources
             self.new_source = True
@@ -131,13 +137,18 @@ class WindowServer(object):
             frame = np.copy(self.frame_orig)
             # frame = self.frame_orig
         elif self.source_type is 'auto':
-            frame = self.auto_effect.process(self.key_list)
-            self.auto_effect.print_update()
+            if self.post_process:
+                # passive auto mode
+                frame = self.auto_effect.process(self.key_list, key_lock=True)
+            else:
+                # active auto mode
+                frame = self.auto_effect.process(self.key_list)
+                self.auto_effect.print_update()
 
         if self.source_type is not 'auto':
             if frame is None:
                 raise TypeError('Frame is NoneType??')
-            # get uniform frame sizes
+            # get uniform frame sizes; 'auto' resizes on its own
             frame = cvutils.resize(frame,
                                    self.window_width, self.window_height)
 
@@ -146,38 +157,43 @@ class WindowServer(object):
             for num in range(self.num_effects):
                 if self.key == ord(str(num)):
                     self.effect_index = num
-                    self.effects[self.effect_index].print_update()
+                    # print first update
+                    self.effects[self.effect_index].print_update(force=True)
                     self.key_list[self.key] = False
 
         # apply borders before effect
         if self.post_process_pre:
             if self.post_process:
+                # active post-process mode
                 frame = self.border.process(frame, self.key_list)
+                self.border.print_update()
             else:
+                # passive post-process mode
                 frame = self.border.process(frame, self.key_list,
                                             key_lock=True)
 
         # process frame
         if self.source_type is not 'auto' and self.effect_index is not None:
             if self.post_process:
+                # passive process mode
                 frame = self.effects[self.effect_index].process(
                     frame, self.key_list, key_lock=True)
             else:
+                # active process mode
                 frame = self.effects[self.effect_index].process(
                     frame, self.key_list)
-                # output info
-                if self.effects[self.effect_index].update_output > -1:
-                    self.effects[self.effect_index].print_update()
+                self.effects[self.effect_index].print_update()
 
         # apply borders after effect
         if not self.post_process_pre:
             if self.post_process:
+                # active post-process mode
                 frame = self.border.process(frame, self.key_list)
-                #             frame = postproc.process(frame, key_list)
+                self.border.print_update()
             else:
+                # passive post-process mode
                 frame = self.border.process(frame, self.key_list,
                                             key_lock=True)
-                # frame = postproc.process(frame, key_list, key_lock=True)
 
         # control animation
         self.fr_count += 1
