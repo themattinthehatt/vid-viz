@@ -11,25 +11,14 @@ import numpy as np
 import utils as util
 
 
-INF = 1000
-NONE = {
-    'desc': 'unassigned',
-    'name': '',
-    'val': 0,
-    'init': 0,
-    'min': 0,
-    'max': 1,
-    'mod': INF,
-    'step': 1,
-    'inc': False,
-    'dec': False}
-
-
 class Effect(object):
     """Base class for vid-viz effects"""
-    def __init__(self):
+
+    def __init__(self, style='effect'):
+
         # set attributes common to all effects
         self.name = None
+        self.type = style
         self.props = None
         self.max_num_styles = 1
         self.auto_play = False
@@ -41,6 +30,19 @@ class Effect(object):
             num_samples=1,
             num_channels=self.chan_vec_pos.size)
         self.update_output = False  # boolean for updating screen output
+
+        self.inf = 1000
+        self.none_dict = {
+            'desc': 'unassigned',
+            'name': '',
+            'val': 0,
+            'init': 0,
+            'min': 0,
+            'max': 1,
+            'mod': self.inf,
+            'step': 1,
+            'inc': False,
+            'dec': False}
 
     def _process_io(self, key_list):
 
@@ -117,7 +119,7 @@ class Effect(object):
             if self.props[index]['inc']:
                 self.props[index]['inc'] = False
                 self.props[index]['val'] += self.props[index]['step']
-            if self.props[index]['mod'] != INF:
+            if self.props[index]['mod'] != self.inf:
                 self.props[index]['val'] = np.mod(
                     self.props[index]['val'],
                     self.props[index]['mod'])
@@ -164,8 +166,12 @@ class Effect(object):
         print('w - toggle random walk')
         print('/ - reset effect parameters')
         print('q - quit %s effect' % self.name)
-        print('~ - enable border effects')
-        print('spacebar - cycle through sources')
+        if self.type == 'effect':
+            print('~ - enable post-processing edit mode')
+            print('spacebar - cycle through sources')
+        elif self.type == 'postproc':
+            print('tab - reverse processing order')
+            print('backspace - quit post-processing edit mode')
 
     def reset(self):
         for index, _ in enumerate(self.props):
@@ -192,9 +198,9 @@ class Border(Effect):
         backspace - quit border effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(Border, self).__init__()
+        super(Border, self).__init__(style=style)
         self.name = 'border'
 
         # user option constants
@@ -205,7 +211,7 @@ class Border(Effect):
             'init': 1.0,
             'min': 0.01,
             'max': 1.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.05,
             'inc': False,
             'dec': False}
@@ -216,7 +222,7 @@ class Border(Effect):
             'init': 1.0,
             'min': 1.0,
             'max': 10.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.05,
             'inc': False,
             'dec': False}
@@ -225,8 +231,8 @@ class Border(Effect):
             'name': 'rot_angle',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 360,
             'step': 5,
             'inc': False,
@@ -238,7 +244,7 @@ class Border(Effect):
             'init': 0,
             'min': -500,
             'max': 500,
-            'mod': INF,
+            'mod': self.inf,
             'step': 10,
             'inc': False,
             'dec': False}
@@ -249,7 +255,7 @@ class Border(Effect):
             'init': 0,
             'min': -500,
             'max': 500,
-            'mod': INF,
+            'mod': self.inf,
             'step': 10,
             'inc': False,
             'dec': False}
@@ -260,7 +266,7 @@ class Border(Effect):
             MULT_FACTOR,
             ZOOM_FACTOR,
             ROT_ANGLE,
-            NONE,
+            self.none_dict,
             SHIFT_PIX_VERT,
             SHIFT_PIX_HORZ]
 
@@ -361,12 +367,6 @@ class Border(Effect):
 
         return frame
 
-    def print_extra_updates(self):
-        print('t - toggle between border styles')
-        print('tab - reverse processing/bordering order')
-        print('/ - reset border parameters')
-        print('backspace - quit editing border effects')
-
 
 class PostProcess(Effect):
     """
@@ -380,9 +380,10 @@ class PostProcess(Effect):
         lrud arrows - translate image
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(PostProcess, self).__init__()
+        super(PostProcess, self).__init__(style=style)
+        self.name = 'filter'
 
         GAUSSIAN_KERN = {
             'desc': 'kernel size for gaussian smoothing',
@@ -391,7 +392,7 @@ class PostProcess(Effect):
             'init': 7,
             'min': 3,
             'max': 75,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -402,7 +403,7 @@ class PostProcess(Effect):
             'init': 7,
             'min': 3,
             'max': 75,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -412,10 +413,10 @@ class PostProcess(Effect):
         self.props = [
             GAUSSIAN_KERN,
             MEDIAN_KERN,
-            NONE,
-            NONE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -479,9 +480,9 @@ class Threshold(Effect):
         q - quit threshold effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(Threshold, self).__init__()
+        super(Threshold, self).__init__(style=style)
         self.name = 'threshold'
 
         # user option constants
@@ -492,7 +493,7 @@ class Threshold(Effect):
             'init': 21,
             'min': 3,
             'max': 71,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -503,7 +504,7 @@ class Threshold(Effect):
             'init': 4,
             'min': 0,
             'max': 30,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -513,10 +514,10 @@ class Threshold(Effect):
         self.props = [
             THRESH_KERNEL,
             THRESH_OFFSET,
-            NONE,
-            NONE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -629,9 +630,9 @@ class Alien(Effect):
         q - quit alien effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(Alien, self).__init__()
+        super(Alien, self).__init__(style=style)
         self.name = 'alien'
 
         # user option constants
@@ -642,7 +643,7 @@ class Alien(Effect):
             'init': 0.2,
             'min': 0.0,
             'max': 10.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.05,
             'inc': False,
             'dec': False}
@@ -651,8 +652,8 @@ class Alien(Effect):
             'name': 'phase',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 2 * np.pi,
             'step': np.pi / 10.0,
             'inc': False,
@@ -663,10 +664,10 @@ class Alien(Effect):
         self.props = [
             FREQ,
             PHASE,
-            NONE,
-            NONE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -792,9 +793,9 @@ class RGBWalk(Effect):
         q - quit rgbwalk effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(RGBWalk, self).__init__()
+        super(RGBWalk, self).__init__(style=style)
         self.name = 'rgb-walk'
 
         # user option constants
@@ -805,7 +806,7 @@ class RGBWalk(Effect):
             'init': 5.0,
             'min': 0.5,
             'max': 15.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1.0,
             'inc': False,
             'dec': False}
@@ -813,12 +814,12 @@ class RGBWalk(Effect):
 
         # combine dicts into a list for easy general access
         self.props = [
-            NONE,
-            NONE,
-            NONE,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
             step_SIZE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -902,9 +903,9 @@ class RGBBurst(Effect):
         q - quit rgbburst effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(RGBBurst, self).__init__()
+        super(RGBBurst, self).__init__(style=style)
         self.name = 'rgb-burst'
 
         # user option constants
@@ -915,7 +916,7 @@ class RGBBurst(Effect):
             'init': 10,
             'min': 1,
             'max': 100,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -926,7 +927,7 @@ class RGBBurst(Effect):
             'init': 0.8,
             'min': 0.3,
             'max': 0.99,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.01,
             'inc': False,
             'dec': False}
@@ -937,7 +938,7 @@ class RGBBurst(Effect):
             'init': 1.1,
             'min': 1.01,
             'max': 2.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.01,
             'inc': False,
             'dec': False}
@@ -948,7 +949,7 @@ class RGBBurst(Effect):
             'init': 5.0,
             'min': 0.5,
             'max': 15.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1.0,
             'inc': False,
             'dec': False}
@@ -960,8 +961,8 @@ class RGBBurst(Effect):
             FRAME_decAY,
             EXP_RATE,
             step_SIZE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -1113,9 +1114,9 @@ class HueBloom(Effect):
         q - quit huebloom effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(HueBloom, self).__init__()
+        super(HueBloom, self).__init__(style=style)
         self.name = 'hue-bloom'
 
         # user option constants
@@ -1126,7 +1127,7 @@ class HueBloom(Effect):
             'init': 10,
             'min': 2,
             'max': 100,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1137,7 +1138,7 @@ class HueBloom(Effect):
             'init': 3,
             'min': 3,
             'max': 51,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1148,7 +1149,7 @@ class HueBloom(Effect):
             'init': 0.1,
             'min': 0.05,
             'max': 5,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.05,
             'inc': False,
             'dec': False}
@@ -1159,9 +1160,9 @@ class HueBloom(Effect):
             DIM_SIZE,
             BLUR_KERNEL,
             PULSE_FREQ,
-            NONE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0
@@ -1294,9 +1295,9 @@ class HueSwirl(Effect):
         q - quit hueswirl effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(HueSwirl, self).__init__()
+        super(HueSwirl, self).__init__(style=style)
         self.name = 'hue-swirl'
 
         # user option constants
@@ -1307,7 +1308,7 @@ class HueSwirl(Effect):
             'init': 1,
             'min': 1,
             'max': 100,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -1318,7 +1319,7 @@ class HueSwirl(Effect):
             'init': 19,
             'min': 3,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1329,7 +1330,7 @@ class HueSwirl(Effect):
             'init': 5,
             'min': 5,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1340,7 +1341,7 @@ class HueSwirl(Effect):
             'init': 0,
             'min': 0,
             'max': 75,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -1349,8 +1350,8 @@ class HueSwirl(Effect):
             'name': 'mask_offset',
             'val': 255,
             'init': 255,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 255,
             'step': 5,
             'inc': False,
@@ -1360,8 +1361,8 @@ class HueSwirl(Effect):
             'name': 'hue_offset',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 180,
             'step': 5,
             'inc': False,
@@ -1613,9 +1614,9 @@ class HueSwirlMover(Effect):
         q - quit hueswirl effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(HueSwirlMover, self).__init__()
+        super(HueSwirlMover, self).__init__(style=style)
         self.name = 'hue-swirl-mover'
 
         # user option constants
@@ -1626,7 +1627,7 @@ class HueSwirlMover(Effect):
             'init': 2,
             'min': 2,
             'max': 100,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1637,7 +1638,7 @@ class HueSwirlMover(Effect):
             'init': 19,
             'min': 3,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1648,7 +1649,7 @@ class HueSwirlMover(Effect):
             'init': 5,
             'min': 5,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1659,7 +1660,7 @@ class HueSwirlMover(Effect):
             'init': 0,
             'min': 0,
             'max': 75,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -1670,7 +1671,7 @@ class HueSwirlMover(Effect):
             'init': 0.5,
             'min': 0.05,
             'max': 1.0,
-            'mod': INF,
+            'mod': self.inf,
             'step': 0.05,
             'inc': False,
             'dec': False}
@@ -1679,8 +1680,8 @@ class HueSwirlMover(Effect):
             'name': 'hue_offset',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 180,
             'step': 5,
             'inc': False,
@@ -1888,10 +1889,10 @@ class HueCrusher(Effect):
         q - quit huecrusher effect
     """
 
-    def __init__(self):
+    def __init__(self, style='effect'):
 
-        super(HueCrusher, self).__init__()
-        name = 'hue-crusher'
+        super(HueCrusher, self).__init__(style=style)
+        self.name = 'hue-crusher'
 
         # user option constants
         NUM_CHUNKS = {
@@ -1901,7 +1902,7 @@ class HueCrusher(Effect):
             'init': 3,
             'min': 1,
             'max': 10,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -1910,8 +1911,8 @@ class HueCrusher(Effect):
             'name': 'center_offset',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 255,
             'step': 5,
             'inc': False,
@@ -1923,7 +1924,7 @@ class HueCrusher(Effect):
             'init': 16,
             'min': 3,
             'max': 180,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -1934,9 +1935,9 @@ class HueCrusher(Effect):
             NUM_CHUNKS,
             CENTER_OFFSET,
             CHUNK_WIDTH,
-            NONE,
-            NONE,
-            NONE]
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
 
         # user options
         self.style = 0

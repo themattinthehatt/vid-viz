@@ -11,25 +11,12 @@ from os.path import join, isfile
 import cv2
 import numpy as np
 
-import viztools as vv
+import viztools as filters
 import utils as util
 import cvutils as cvutil
 
-INF = 1000
-NONE = {
-    'desc': 'unassigned',
-    'name': '',
-    'val': 0,
-    'init': 0,
-    'min': 0,
-    'max': 1,
-    'mod': INF,
-    'step': 1,
-    'inc': False,
-    'dec': False}
 
-
-class HueSwirlChain(vv.Effect):
+class HueSwirlChain(filters.Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
     with iteratively applying blur kernels. Iterative blur occurs 
@@ -62,7 +49,7 @@ class HueSwirlChain(vv.Effect):
             'init': 1,
             'min': 1,
             'max': 100,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -73,7 +60,7 @@ class HueSwirlChain(vv.Effect):
             'init': 19,
             'min': 3,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -84,7 +71,7 @@ class HueSwirlChain(vv.Effect):
             'init': 5,
             'min': 5,
             'max': 31,
-            'mod': INF,
+            'mod': self.inf,
             'step': 2,
             'inc': False,
             'dec': False}
@@ -93,8 +80,8 @@ class HueSwirlChain(vv.Effect):
             'name': 'mask_offset',
             'val': 235,
             'init': 235,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 256,
             'step': 5,
             'inc': False,
@@ -106,7 +93,7 @@ class HueSwirlChain(vv.Effect):
             'init': 0,
             'min': 0,
             'max': 75,
-            'mod': INF,
+            'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
@@ -116,8 +103,8 @@ class HueSwirlChain(vv.Effect):
             'name': 'hue_offset',
             'val': 0,
             'init': 0,
-            'min': -INF,
-            'max': INF,
+            'min': -self.inf,
+            'max': self.inf,
             'mod': 180,
             'step': 5,
             'inc': False,

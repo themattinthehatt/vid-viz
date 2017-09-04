@@ -9,7 +9,28 @@ import pyglet.window.key as key
 import cv2
 
 
-class MyWindowPyglet(pyglet.window.Window):
+class MyWindow(object):
+
+    def set_image_data(self):
+        raise NotImplementedError
+
+    def on_draw(self):
+        raise NotImplementedError
+
+    def on_key_press(self):
+        raise NotImplementedError
+
+    def clear_key_press(self):
+        raise NotImplementedError
+
+    def return_key(self):
+        raise NotImplementedError
+
+    def close(self):
+        raise NotImplementedError
+
+
+class MyWindowPyglet(pyglet.window.Window, MyWindow):
 
     def __init__(self, disp_fps, *args, **kwargs):
         # call pyglet.window.Window constructor
@@ -196,7 +217,8 @@ class MyWindowPyglet(pyglet.window.Window):
         return ascii_key
 
 
-class MyWindowOCV(object):
+class MyWindowOCV(MyWindow):
+
     def __init__(self, disp_fps, fullscreen=False, name='frame'):
 
         # display fps in window

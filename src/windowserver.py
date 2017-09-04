@@ -18,7 +18,7 @@ class WindowServer(object):
         self.window_height = window_height
         self.formats = formats
 
-        # initialize processing objects
+        # initialize effect objects
         self.effects = [
             filters.Threshold(),     # 0
             filters.Alien(),         # 1
@@ -31,12 +31,16 @@ class WindowServer(object):
         self.effect_index = None
         self.num_effects = len(self.effects)
 
-        # set pre/post-processing options
-        self.border = filters.Border()
-        self.postproc = filters.PostProcess()
-        self.post_process = False  # post-proc is active effect
+        # initialize post-processing objects
+        self.postproc = [
+            filters.Border(style='postproc'),        # 0
+            filters.PostProcess(style='postproc'),   # 1
+        ]
+        self.postproc_index = None
+        self.num_postproc = len(self.postproc)
         self.post_process_pre = False  # post-proc pre/proceeds other effects
 
+        self.mode = 'effect'  # define active mode; 'effect' | 'postproc'
         # get source material meta-data
         self.source_index = 0
         self.source_list = utils.get_sources()
@@ -59,76 +63,11 @@ class WindowServer(object):
     def process(self):
 
         # parse keyboard input
-        if self.key_list[ord('q')]:
-            # quit current effect
-            if self.effect_index is not None:
-                print('Quitting %s effect' %
-                      self.effects[self.effect_index].name)
-                print('')
-                print('')
-            self.effect_index = None
-        elif self.key_list[ord('\b')]:
-            self.post_process = False
-            if self.effect_index is not None:
-                self.effects[self.effect_index].print_update(force=True)
-            else:
-                print('')
-                print('')
-        elif self.key_list[ord('`')]:
-            self.post_process = True
-            self.border.print_update(force=True)
-        elif self.key_list[ord(' ')]:
-            self.source_index = (self.source_index + 1) % self.num_sources
-            self.new_source = True
-        elif self.key_list[ord('\t')]:
-            # only change post-processing order if in post-process mode
-            if self.post_process:
-                self.post_process_pre = not self.post_process_pre
+        self._process_io()
 
         # load new source
         if self.new_source:
-
-            # reset necessary parameters
-            self.new_source = False
-            self.effect_index = None
-            self.fr_count = 0
-            for _, effect in enumerate(self.effects):
-                effect.reset()
-            self.border.reset()
-            self.postproc.reset()
-
-            # free previous resources
-            if self.source_type is 'cam' or self.source_type is 'video':
-                self.cap.release()
-
-            # load source
-            self.source_type = self.source_list[self.source_index]['file_type']
-            source_loc = self.source_list[self.source_index]['file_loc']
-            print('Loading %s' % source_loc)
-            if self.source_type is 'cam':
-                self.cap = cv2.VideoCapture(0)
-                self.total_frame_count = float('inf')
-                self.frame_mask = None
-            elif self.source_type is 'video':
-                self.cap = cv2.VideoCapture(source_loc)
-                self.total_frame_count = \
-                    int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.frame_mask = None
-            elif self.source_type is 'image':
-                self.frame_orig = cv2.imread(source_loc)
-                self.total_frame_count = float('inf')
-                self.frame_mask = np.copy(self.frame_orig)
-            elif self.source_type is 'auto':
-                if source_loc is 'hueswirlchain':
-                    self.auto_effect = auto.HueSwirlChain(
-                        self.window_width, self.window_height)
-                    self.auto_effect.update_output = 1  # force output
-                    self.auto_effect.print_update()
-                else:
-                    print('Invalid auto effect')
-                    self.total_frame_count = float('inf')
-            else:
-                raise TypeError('Invalid source_type')
+            self._load_new_source()
 
         # get frame and relevant info
         if self.source_type is 'cam' or self.source_type is 'video':
@@ -137,7 +76,7 @@ class WindowServer(object):
             frame = np.copy(self.frame_orig)
             # frame = self.frame_orig
         elif self.source_type is 'auto':
-            if self.post_process:
+            if self.mode == 'postproc':
                 # passive auto mode
                 frame = self.auto_effect.process(self.key_list, key_lock=True)
             else:
@@ -145,55 +84,68 @@ class WindowServer(object):
                 frame = self.auto_effect.process(self.key_list)
                 self.auto_effect.print_update()
 
-        if self.source_type is not 'auto':
+        # get uniform frame sizes; 'auto' and 'gen' resize on their own
+        if self.source_type is not 'auto' and self.source_type is not 'gen':
             if frame is None:
                 raise TypeError('Frame is NoneType??')
-            # get uniform frame sizes; 'auto' resizes on its own
-            frame = cvutils.resize(frame,
-                                   self.window_width, self.window_height)
+            frame = cvutils.resize(
+                frame, self.window_width, self.window_height)
 
         # update current effect
-        if self.effect_index is None:
+        if self.effect_index is None and self.mode == 'effect':
             for num in range(self.num_effects):
                 if self.key == ord(str(num)):
                     self.effect_index = num
                     # print first update
-                    self.effects[self.effect_index].print_update(force=True)
+                    self.effects[self.effect_index].print_update(
+                        force=True)
+                    self.key_list[self.key] = False
+
+        # update current post-processing effect
+        if self.postproc_index is None and self.mode == 'postproc':
+            for num in range(self.num_postproc):
+                if self.key == ord(str(num)):
+                    self.postproc_index = num
+                    # print first update
+                    self.postproc[self.postproc_index].print_update(
+                        force=True)
                     self.key_list[self.key] = False
 
         # apply borders before effect
-        if self.post_process_pre:
-            if self.post_process:
+        if self.post_process_pre and self.postproc_index is not None:
+            if self.mode == 'postproc':
                 # active post-process mode
-                frame = self.border.process(frame, self.key_list)
-                self.border.print_update()
+                frame = self.postproc[self.postproc_index].process(
+                    frame, self.key_list)
+                self.postproc[self.postproc_index].print_update()
             else:
                 # passive post-process mode
-                frame = self.border.process(frame, self.key_list,
-                                            key_lock=True)
+                frame = self.postproc[self.postproc_index].process(
+                    frame, self.key_list, key_lock=True)
 
         # process frame
         if self.source_type is not 'auto' and self.effect_index is not None:
-            if self.post_process:
-                # passive process mode
-                frame = self.effects[self.effect_index].process(
-                    frame, self.key_list, key_lock=True)
-            else:
+            if self.mode == 'effect':
                 # active process mode
                 frame = self.effects[self.effect_index].process(
                     frame, self.key_list)
                 self.effects[self.effect_index].print_update()
+            else:
+                # passive process mode
+                frame = self.effects[self.effect_index].process(
+                    frame, self.key_list, key_lock=True)
 
         # apply borders after effect
-        if not self.post_process_pre:
-            if self.post_process:
+        if not self.post_process_pre and self.postproc_index is not None:
+            if self.mode == 'postproc':
                 # active post-process mode
-                frame = self.border.process(frame, self.key_list)
-                self.border.print_update()
+                frame = self.postproc[self.postproc_index].process(
+                    frame, self.key_list)
+                self.postproc[self.postproc_index].print_update()
             else:
                 # passive post-process mode
-                frame = self.border.process(frame, self.key_list,
-                                            key_lock=True)
+                frame = self.postproc[self.postproc_index].process(
+                    frame, self.key_list, key_lock=True)
 
         # control animation
         self.fr_count += 1
@@ -208,6 +160,103 @@ class WindowServer(object):
             return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         elif self.formats == 'BGR':
             return frame
+
+    def _process_io(self):
+
+        # process keyboard input
+        if self.key_list[ord('q')]:
+            # quit current effect
+            if self.mode == 'effect' and self.effect_index is not None:
+                print('Quitting %s effect\n' %
+                      self.effects[self.effect_index].name)
+                self._display_options('effect')
+                self.effect_index = None
+            elif self.mode == 'postproc' and self.postproc_index is not None:
+                print('Quitting %s post-processing effect\n' %
+                      self.postproc[self.postproc_index].name)
+                self._display_options('postproc')
+                self.postproc_index = None
+        elif self.key_list[ord('\b')]:
+            # quit editing post-processing effect
+            self.mode = 'effect'
+            print('Exiting post-processing mode\n')
+            if self.effect_index is not None:
+                self.effects[self.effect_index].print_update(force=True)
+            else:
+                self._display_options('effect')
+        elif self.key_list[ord('`')]:
+            self.mode = 'postproc'
+            print('Entering post-processing mode\n')
+            if self.postproc_index is not None:
+                self.postproc[self.postproc_index].print_update(force=True)
+            else:
+                self._display_options('postproc')
+        elif self.key_list[ord(' ')]:
+            self.source_index = (self.source_index + 1) % self.num_sources
+            self.new_source = True
+        elif self.key_list[ord('\t')]:
+            # only change post-processing order if in post-process mode
+            if self.mode == 'postproc':
+                self.post_process_pre = not self.post_process_pre
+
+    def _load_new_source(self):
+
+        # reset necessary parameters
+        self.new_source = False
+        self.effect_index = None
+        self.fr_count = 0
+        for _, effect in enumerate(self.effects):
+            effect.reset()
+        for _, effect in enumerate(self.postproc):
+            effect.reset()
+
+        # free previous resources
+        if self.source_type is 'cam' or self.source_type is 'video':
+            self.cap.release()
+
+        # load source
+        self.source_type = self.source_list[self.source_index]['file_type']
+        source_loc = self.source_list[self.source_index]['file_loc']
+        print('Loading %s' % source_loc)
+        if self.source_type is 'cam':
+            self.cap = cv2.VideoCapture(0)
+            self.total_frame_count = float('inf')
+            self.frame_mask = None
+        elif self.source_type is 'video':
+            self.cap = cv2.VideoCapture(source_loc)
+            self.total_frame_count = \
+                int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.frame_mask = None
+        elif self.source_type is 'image':
+            self.frame_orig = cv2.imread(source_loc)
+            self.total_frame_count = float('inf')
+            self.frame_mask = np.copy(self.frame_orig)
+        elif self.source_type is 'auto':
+            if source_loc is 'hueswirlchain':
+                self.auto_effect = auto.HueSwirlChain(
+                    self.window_width, self.window_height)
+                self.auto_effect.update_output = 1  # force output
+                self.auto_effect.print_update()
+            else:
+                print('Invalid auto effect')
+                self.total_frame_count = float('inf')
+        else:
+            raise TypeError('Invalid source_type')
+
+        # display effect options to user
+        self._display_options('effect')
+
+    def _display_options(self, style):
+        if style == 'effect':
+            print('Effect options:')
+            for index, effect in enumerate(self.effects):
+                print('%i: %s' % (index, effect.name))
+        elif style == 'postproc':
+            print('Post-processing options:')
+            for index, effect in enumerate(self.postproc):
+                print('%i: %s' % (index, effect.name))
+        else:
+            raise NameError
 
     def update_key_list(self, key):
         self.key = key
