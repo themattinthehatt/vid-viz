@@ -20,21 +20,21 @@ class WindowServer(object):
 
         # initialize effect objects
         self.effects = [
-            filters.Threshold(),     # 0
-            filters.Alien(),         # 1
-            filters.RGBWalk(),       # 2
-            filters.RGBBurst(),      # 3
-            filters.HueBloom(),      # 4
-            filters.HueSwirl(),      # 5
-            filters.HueSwirlMover()  # 6
+            filters.Threshold(),
+            filters.Alien(),
+            filters.RGBWalk(),
+            filters.RGBBurst(),
+            filters.HueBloom(),
+            filters.HueSwirl(),
+            filters.HueSwirlMover()
         ]
         self.effect_index = None
         self.num_effects = len(self.effects)
 
         # initialize post-processing objects
         self.postproc = [
-            filters.Border(style='postproc'),        # 0
-            filters.PostProcess(style='postproc'),   # 1
+            filters.Border(style='postproc'),
+            filters.Grating(style='postproc'),
         ]
         self.postproc_index = None
         self.num_postproc = len(self.postproc)
@@ -154,7 +154,7 @@ class WindowServer(object):
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 1)
             self.fr_count = 1
 
-        self.clear_key_press()
+        self._clear_key_press()
 
         if self.formats == 'RGB':
             return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -262,7 +262,7 @@ class WindowServer(object):
         self.key = key
         self.key_list[self.key] = True
 
-    def clear_key_press(self):
+    def _clear_key_press(self):
         # don't clear escape
         if self.key != 27:
             self.key_list[self.key] = False

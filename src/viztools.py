@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 import utils as util
+import cvutils
 
 
 class Effect(object):
@@ -270,15 +271,6 @@ class Border(Effect):
             SHIFT_PIX_VERT,
             SHIFT_PIX_HORZ]
 
-        # user options
-        self.style = 0
-        self.reinitialize = False
-        self.random_walk = False
-        self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
-            num_samples=10,
-            num_channels=self.chan_vec_pos.size)
-
     def process(self, frame, key_list, key_lock=False):
 
         # process keyboard input
@@ -368,64 +360,67 @@ class Border(Effect):
         return frame
 
 
-class PostProcess(Effect):
+class Grating(Effect):
     """
-    Apply post-processing (image filtering) to final image
+    Render image in rectangular cells, the aspect ratio and border thickness of
+    which are controllable parameters
 
     KEYBOARD INPUTS:
-        -/+ - decrease/increase gaussian smoothing kernel
-        [/] - decrease/increase median filtering kernel
+        -/+ - decrease/increase border proportion
+        [/] - None
         ;/' - None
         ,/. - None
-        lrud arrows - translate image
+        lrud arrows - decrease/increase number of cells in horz/vert direction
     """
 
     def __init__(self, style='effect'):
 
-        super(PostProcess, self).__init__(style=style)
-        self.name = 'filter'
+        super(Grating, self).__init__(style=style)
+        self.name = 'grating'
 
-        GAUSSIAN_KERN = {
-            'desc': 'kernel size for gaussian smoothing',
-            'name': 'gauss_kern',
-            'val': 7,
-            'init': 7,
-            'min': 3,
-            'max': 75,
+        border_prop = {
+            'desc': 'proportion of cell used for border',
+            'name': 'border_prop',
+            'val': 0.1,
+            'init': 0.2,
+            'min': 0.0,
+            'max': 1.0,
             'mod': self.inf,
-            'step': 2,
+            'step': 0.02,
             'inc': False,
             'dec': False}
-        MEDIAN_KERN = {
-            'desc': 'kernel size for median filtering',
-            'name': 'median_kern',
-            'val': 7,
-            'init': 7,
-            'min': 3,
-            'max': 75,
+        cells_horz = {
+            'desc': 'number of cells in horizontal direction',
+            'name': 'num_cells_horz',
+            'val': 10,
+            'init': 10,
+            'min': 1,
+            'max': 50,
             'mod': self.inf,
-            'step': 2,
+            'step': 1,
             'inc': False,
             'dec': False}
-        self.max_num_styles = 3
+        cells_vert = {
+            'desc': 'number of cells in vertical direction',
+            'name': 'num_cells_vert',
+            'val': 5,
+            'init': 5,
+            'min': 1,
+            'max': 50,
+            'mod': self.inf,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 1
 
         # combine dicts into a list for easy general access
         self.props = [
-            GAUSSIAN_KERN,
-            MEDIAN_KERN,
+            border_prop,
             self.none_dict,
             self.none_dict,
             self.none_dict,
-            self.none_dict]
-
-        # user options
-        self.style = 0
-        self.reinitialize = False
-        self.random_walk = False
-        self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
-            num_samples=10,
-            num_channels=self.chan_vec_pos.size)
+            cells_vert,
+            cells_horz]
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -439,8 +434,8 @@ class PostProcess(Effect):
                 self.props[index]['val'] = self.props[index]['init']
 
         # human-readable names
-        gauss_kern = self.props[0]['val']
-        median_kern = self.props[1]['val']
+        border_prop = self.props[0]['val']
+        num_cells = [self.props[4]['val'], self.props[5]['val']]
 
         # process image
         if len(frame.shape) == 3:
@@ -448,17 +443,57 @@ class PostProcess(Effect):
         elif len(frame.shape) == 2:
             [im_height, im_width] = frame.shape
 
-        # rotate
-        if self.style == 1:
-            frame_blurred = cv2.GaussianBlur(frame, (gauss_kern, gauss_kern), 0)
-            # frame = cv2.addWeighted(
-            #     frame, 0.5,
-            #     frame_blurred, 0.5, 0)
-            frame = cv2.bitwise_or(frame, frame_blurred)
-        elif self.style == 2:
-            frame = cv2.medianBlur(frame, median_kern)
+        num_pix_cell_half = [(im_height / num_cells[0]) // 2,
+                             (im_width / num_cells[1]) // 2]
+        num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
+                        int(2 * num_pix_cell_half[1] + 1)]
+        num_pix_img_half = [int((num_pix_cell[0] * (1 - border_prop) // 2)),
+                            int((num_pix_cell[1] * (1 - border_prop) // 2))]
+        centers = [[int(val * num_pix_cell[0] + num_pix_cell_half[0] + 1)
+                    for val in range(num_cells[0])],
+                   [int(val * num_pix_cell[1] + num_pix_cell_half[1] + 1)
+                    for val in range(num_cells[1])]]
+        # shift center points at end
+        centers[0][-1] = int(im_height - num_pix_cell_half[0] - 1)
+        centers[1][-1] = int(im_width - num_pix_cell_half[1] - 1)
 
-        return frame
+        if border_prop == 0.0:
+            background = frame
+        elif border_prop == 1.0:
+            background = np.zeros(shape=frame.shape, dtype=np.uint8)
+        else:
+            background = np.zeros(shape=frame.shape, dtype=np.uint8)
+
+            # tile background array with image
+            for h in range(num_cells[0]):
+                for w in range(num_cells[1]):
+                    cell = cv2.getRectSubPix(
+                        frame,
+                        (num_pix_cell[1], num_pix_cell[0]),
+                        (centers[1][w], centers[0][h]))
+                    cell = cv2.resize(
+                        cell,
+                        (2 * num_pix_img_half[1] + 1,
+                         2 * num_pix_img_half[0] + 1),
+                        interpolation=cv2.INTER_LINEAR)
+                    background[
+                        centers[0][h] - num_pix_img_half[0]:
+                        centers[0][h] + num_pix_img_half[0] + 1,
+                        centers[1][w] - num_pix_img_half[1]:
+                        centers[1][w] + num_pix_img_half[1] + 1,
+                        :] = cell
+
+            # cell = cv2.getRectSubPix(
+            #     frame,
+            #     (int(im_width / 4), int(im_width / 4)),
+            #     (int(im_width / 2), int(im_height / 2)))
+            # background[0:cell.shape[0], 0:cell.shape[1], :] = cell
+            # background = cv2.resize(
+            #     cell,
+            #     (im_width, im_height),
+            #     interpolation=cv2.INTER_LINEAR)
+
+        return background
 
 
 class Threshold(Effect):
@@ -759,7 +794,7 @@ class Alien(Effect):
                                                        self.chan_freq[chan] +
                                                        self.chan_phase[chan])
 
-        frame = frame.astype('uint8')
+        frame = frame.astype(np.uint8)
 
         return frame
 
@@ -1227,7 +1262,7 @@ class HueBloom(Effect):
             (im_width, im_height),
             interpolation=cv2.INTER_CUBIC)
         frame_back = 179.0 * frame_back
-        frame_back = frame_back.astype('uint8')
+        frame_back = frame_back.astype(np.uint8)
         frame_back = cv2.cvtColor(frame_back, cv2.COLOR_HSV2BGR)
 
         # get mask
@@ -1479,7 +1514,7 @@ class HueSwirl(Effect):
                 interpolation=cv2.INTER_CUBIC)
             self.frame_back[:, :, 0] = 179.0 * self.frame_back[:, :, 0]
             self.frame_back[:, :, 1:3] = 255.0 * self.frame_back[:, :, 1:3]
-            self.frame_back = self.frame_back.astype('uint8')
+            self.frame_back = self.frame_back.astype(np.uint8)
             self.frame_back = cv2.cvtColor(self.frame_back,
                                            cv2.COLOR_HSV2BGR)
 
@@ -1558,7 +1593,7 @@ class HueSwirl(Effect):
                     0)
 
         # get masked then blurred background
-        frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
+        frame_back_blurred = np.zeros(self.frame_back.shape, dtype=np.uint8)
         for chan in range(3):
             frame_back_blurred[:, :, chan] = cv2.bitwise_and(
                 self.frame_back[:, :, chan],
@@ -1569,7 +1604,7 @@ class HueSwirl(Effect):
             0)
 
         # remask blurred background
-        frame = np.zeros(self.frame_back.shape, dtype='uint8')
+        frame = np.zeros(self.frame_back.shape, dtype=np.uint8)
         for chan in range(3):
             frame[:, :, chan] = cv2.bitwise_and(
                 frame_back_blurred[:, :, chan],
@@ -1755,7 +1790,7 @@ class HueSwirlMover(Effect):
                 (im_width, im_height),
                 interpolation=cv2.INTER_CUBIC)
             self.frame_back = 179.0 * self.frame_back
-            self.frame_back = self.frame_back.astype('uint8')
+            self.frame_back = self.frame_back.astype(np.uint8)
 
         # update background frame if necessary
         if int(hue_offset) is not int(self.prev_hue_offset):
@@ -1763,7 +1798,7 @@ class HueSwirlMover(Effect):
             self.frame_back += abs(
                 int(hue_offset - self.prev_hue_offset))
             self.frame_back = np.mod(self.frame_back, 180)
-            self.frame_back = self.frame_back.astype('uint8')
+            self.frame_back = self.frame_back.astype(np.uint8)
             self.prev_hue_offset = hue_offset
 
         if self.style == 0:
@@ -1840,7 +1875,7 @@ class HueSwirlMover(Effect):
                 self.frame_mask_blurred = frame_mask
 
             # get masked then blurred background
-            frame_back_blurred = np.zeros(self.frame_back.shape, dtype='uint8')
+            frame_back_blurred = np.zeros(self.frame_back.shape, dtype=np.uint8)
             for chan in range(3):
                 frame_back_blurred[:, :, chan] = cv2.bitwise_and(
                     self.frame_back[:, :, chan],
@@ -1851,7 +1886,7 @@ class HueSwirlMover(Effect):
                 0)
 
             # remask blurred background
-            frame = np.zeros(self.frame_back.shape, dtype='uint8')
+            frame = np.zeros(self.frame_back.shape, dtype=np.uint8)
             for chan in range(3):
                 frame[:, :, chan] = cv2.bitwise_and(
                     frame_back_blurred[:, :, chan],
@@ -1953,9 +1988,9 @@ class HueCrusher(Effect):
         self.num_chunks_prev = num_chunks
 
         self.chunk_widths_og = int(180 / num_chunks)
-        self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
-        self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
-        self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_range_mins = np.zeros((num_chunks, 1), np.uint8)
+        self.chunk_range_maxs = np.zeros((num_chunks, 1), np.uint8)
+        self.chunk_centers = np.zeros((num_chunks, 1), np.uint8)
         for chunk in range(num_chunks):
             self.chunk_range_mins[chunk] = \
                 chunk * self.chunk_widths_og
@@ -1996,9 +2031,9 @@ class HueCrusher(Effect):
         if int(num_chunks) is not int(self.num_chunks_prev):
             self.num_chunks_prev = num_chunks
             self.chunk_widths_og = int(180 / num_chunks)
-            self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
-            self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
-            self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+            self.chunk_range_mins = np.zeros((num_chunks, 1), np.uint8)
+            self.chunk_range_maxs = np.zeros((num_chunks, 1), np.uint8)
+            self.chunk_centers = np.zeros((num_chunks, 1), np.uint8)
             for chunk in range(num_chunks):
                 self.chunk_range_mins[chunk] = \
                     chunk * self.chunk_widths_og
@@ -2010,7 +2045,7 @@ class HueCrusher(Effect):
 
         # extract hue values
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        hue_final = np.zeros((im_height, im_width), dtype='uint8')
+        hue_final = np.zeros((im_height, im_width), dtype=np.uint8)
 
         # scale whole image
         scale = chunk_width / self.chunk_widths_og
@@ -2028,7 +2063,7 @@ class HueCrusher(Effect):
             # hue band;
             hue = np.mod(frame_scaled[:, :, 0] + chunk_center -
                          int(chunk_width / 2) + center_offset, 180)
-            hue = hue.astype('uint8')
+            hue = hue.astype(np.uint8)
             hue = cv2.bitwise_and(hue, hue_mask)
 
             # put into final hue array (bitwise or takes all nonzero vals)
@@ -2048,9 +2083,9 @@ class HueCrusher(Effect):
         num_chunks = self.props[0]['init']
         self.num_chunks_prev = num_chunks
         self.chunk_widths_og = int(180 / num_chunks)
-        self.chunk_range_mins = np.zeros((num_chunks, 1), 'uint8')
-        self.chunk_range_maxs = np.zeros((num_chunks, 1), 'uint8')
-        self.chunk_centers = np.zeros((num_chunks, 1), 'uint8')
+        self.chunk_range_mins = np.zeros((num_chunks, 1), np.uint8)
+        self.chunk_range_maxs = np.zeros((num_chunks, 1), np.uint8)
+        self.chunk_centers = np.zeros((num_chunks, 1), np.uint8)
         for chunk in range(num_chunks):
             self.chunk_range_mins[chunk] = \
                 chunk * self.chunk_widths_og
