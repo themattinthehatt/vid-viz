@@ -364,7 +364,7 @@ class Cell(object):
     """Helper class for Grating class"""
 
     def __init__(self, num_pix_cell, num_pix_cell_half, border_prop,
-                 center, vel):
+                 center, vel, frame_size=[0, 0]):
         self.num_pix_cell = num_pix_cell
         self.num_pix_cell_half = num_pix_cell_half
         self.center = center
@@ -372,12 +372,21 @@ class Cell(object):
         self.num_pix_img_half = None
         self.border_prop = None
         self.update_border_prop(border_prop)
+        self.frame_size = frame_size
 
     def update_border_prop(self, border_prop):
         self.border_prop = border_prop
         self.num_pix_img_half = \
             [int((self.num_pix_cell[0] * (1 - self.border_prop) // 2)),
              int((self.num_pix_cell[1] * (1 - self.border_prop) // 2))]
+
+    def update_position(self):
+        self.center[0] += self.vel[0]
+        self.center[1] += self.vel[1]
+        if self.center[0] + self.num_pix_cell_half[0] >= self.frame_size[0]:
+            self.center[0] = self.num_pix_img_half[0] + 1
+        if self.center[1] + self.num_pix_cell_half[1] >= self.frame_size[1]:
+            self.center[1] = self.num_pix_img_half[1] + 1
 
     def draw(self, frame, background):
 
@@ -435,7 +444,7 @@ class Grating(Effect):
             'val': 10,
             'init': 10,
             'min': 1,
-            'max': 50,
+            'max': 200,
             'mod': self.inf,
             'step': 1,
             'inc': False,
@@ -446,13 +455,12 @@ class Grating(Effect):
             'val': 5,
             'init': 5,
             'min': 1,
-            'max': 50,
+            'max': 200,
             'mod': self.inf,
             'step': 1,
             'inc': False,
             'dec': False}
-        self.max_num_styles = 1
-        self.cells = []
+        self.max_num_styles = 2
 
         # combine dicts into a list for easy general access
         self.props = [
@@ -462,9 +470,19 @@ class Grating(Effect):
             self.none_dict,
             cells_vert,
             cells_horz]
+
+        # user options
         self.prev_border_prop = self.props[0]['val']
+        self.cells = []
+        self.cell_index = -1  # index into list of cells
 
     def process(self, frame, key_list, key_lock=False):
+
+        # update if blur kernel toggled
+        if key_list[ord('t')]:
+            self.reinitialize = True
+        else:
+            self.reinitialize = False
 
         # process keyboard input
         if not key_lock:
@@ -474,6 +492,7 @@ class Grating(Effect):
             self.reinitialize = False
             for index, _ in enumerate(self.props):
                 self.props[index]['val'] = self.props[index]['init']
+            self.cells = []
 
         # human-readable names
         border_prop = self.props[0]['val']
@@ -534,11 +553,51 @@ class Grating(Effect):
 
         elif self.style == 1:
             # random translation effect
-            pass
+
+            # add cells if necessary
+            while len(self.cells) < int(num_cells[1]):
+                # get initial values for cells
+                num_pix_cell_half = [np.random.randint(10, 30),
+                                     np.random.randint(10, 30)]
+                num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
+                                int(2 * num_pix_cell_half[1] + 1)]
+                centers = [
+                    np.random.randint(num_pix_cell_half[0] + 1,
+                                      im_height - num_pix_cell_half[0]),
+                    np.random.randint(num_pix_cell_half[1] + 1,
+                                      im_width - num_pix_cell_half[1])]
+                velocity = [0, np.random.randint(1, 20)]
+                self.cells.append(Cell(
+                    num_pix_cell, num_pix_cell_half, border_prop,
+                    centers, velocity, frame_size=[im_height, im_width]))
+            # delete cells if necessary
+            while len(self.cells) > int(num_cells[1]):
+                del self.cells[-1]
+
+            # update cells if border prop has changed
+            if self.prev_border_prop != border_prop:
+                self.prev_border_prop = border_prop
+                for _, cell in enumerate(self.cells):
+                    cell.update_border_prop(border_prop)
+
+            # update background with frame info
+            background = np.zeros(shape=frame.shape, dtype=np.uint8)
+
+            # tile background array with image
+            for _, cell in enumerate(self.cells):
+                # update positions of cells
+                cell.update_position()
+                # tile background array with image
+                background = cell.draw(frame, background)
+
         else:
             raise NotImplementedError
 
         return background
+
+    def reset(self):
+        super(Grating, self).reset()
+        self.cells = []
 
 
 class Threshold(Effect):

@@ -147,8 +147,8 @@ elif window_manager == 'opencv':
             time.sleep(1 / target_fps - time_tot)
         time_tot = time.time() - time_pre
 
-        # if disp_fps:
-        #     print('\r%03i fps' % (1.0 / time_tot), end='')
+        if disp_fps:
+            print('\r%03i fps' % (1.0 / time_tot), end='')
 
         if break_loop:
             break
