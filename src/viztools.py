@@ -360,6 +360,46 @@ class Border(Effect):
         return frame
 
 
+class Cell(object):
+    """Helper class for Grating class"""
+
+    def __init__(self, num_pix_cell, num_pix_cell_half, border_prop,
+                 center, vel):
+        self.num_pix_cell = num_pix_cell
+        self.num_pix_cell_half = num_pix_cell_half
+        self.center = center
+        self.vel = vel
+        self.num_pix_img_half = None
+        self.border_prop = None
+        self.update_border_prop(border_prop)
+
+    def update_border_prop(self, border_prop):
+        self.border_prop = border_prop
+        self.num_pix_img_half = \
+            [int((self.num_pix_cell[0] * (1 - self.border_prop) // 2)),
+             int((self.num_pix_cell[1] * (1 - self.border_prop) // 2))]
+
+    def draw(self, frame, background):
+
+        cell = cv2.getRectSubPix(
+            frame,
+            (self.num_pix_cell[1], self.num_pix_cell[0]),
+            (self.center[1], self.center[0]))
+        cell = cv2.resize(
+            cell,
+            (2 * self.num_pix_img_half[1] + 1,
+             2 * self.num_pix_img_half[0] + 1),
+            interpolation=cv2.INTER_LINEAR)
+        background[
+            self.center[0] - self.num_pix_img_half[0]:
+            self.center[0] + self.num_pix_img_half[0] + 1,
+            self.center[1] - self.num_pix_img_half[1]:
+            self.center[1] + self.num_pix_img_half[1] + 1,
+            :] = cell
+
+        return background
+
+
 class Grating(Effect):
     """
     Render image in rectangular cells, the aspect ratio and border thickness of
@@ -412,6 +452,7 @@ class Grating(Effect):
             'inc': False,
             'dec': False}
         self.max_num_styles = 1
+        self.cells = []
 
         # combine dicts into a list for easy general access
         self.props = [
@@ -421,6 +462,7 @@ class Grating(Effect):
             self.none_dict,
             cells_vert,
             cells_horz]
+        self.prev_border_prop = self.props[0]['val']
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -443,55 +485,58 @@ class Grating(Effect):
         elif len(frame.shape) == 2:
             [im_height, im_width] = frame.shape
 
-        num_pix_cell_half = [(im_height / num_cells[0]) // 2,
-                             (im_width / num_cells[1]) // 2]
-        num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
-                        int(2 * num_pix_cell_half[1] + 1)]
-        num_pix_img_half = [int((num_pix_cell[0] * (1 - border_prop) // 2)),
-                            int((num_pix_cell[1] * (1 - border_prop) // 2))]
-        centers = [[int(val * num_pix_cell[0] + num_pix_cell_half[0] + 1)
-                    for val in range(num_cells[0])],
-                   [int(val * num_pix_cell[1] + num_pix_cell_half[1] + 1)
-                    for val in range(num_cells[1])]]
-        # shift center points at end
-        centers[0][-1] = int(im_height - num_pix_cell_half[0] - 1)
-        centers[1][-1] = int(im_width - num_pix_cell_half[1] - 1)
+        if self.style == 0:
+            # original grating style
 
-        if border_prop == 0.0:
-            background = frame
-        elif border_prop == 1.0:
-            background = np.zeros(shape=frame.shape, dtype=np.uint8)
+            # reinitialize cells if number has changed
+            if num_cells[0] * num_cells[1] != len(self.cells):
+
+                # get initial values for cells
+                num_pix_cell_half = [(im_height / num_cells[0]) // 2,
+                                     (im_width / num_cells[1]) // 2]
+                num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
+                                int(2 * num_pix_cell_half[1] + 1)]
+                centers = [
+                    [int(val * num_pix_cell[0] + num_pix_cell_half[0] + 1)
+                        for val in range(num_cells[0])],
+                    [int(val * num_pix_cell[1] + num_pix_cell_half[1] + 1)
+                        for val in range(num_cells[1])]]
+                # shift center points at end
+                centers[0][-1] = int(im_height - num_pix_cell_half[0] - 1)
+                centers[1][-1] = int(im_width - num_pix_cell_half[1] - 1)
+
+                # build cells
+                self.cells = []
+                for h in range(num_cells[0]):
+                    for w in range(num_cells[1]):
+                        self.cells.append(Cell(
+                            num_pix_cell, num_pix_cell_half, border_prop,
+                            [centers[0][h], centers[1][w]], [0, 0]))
+
+            # update cells if border prop has changed
+            if self.prev_border_prop != border_prop:
+                self.prev_border_prop = border_prop
+                for _, cell in enumerate(self.cells):
+                    cell.update_border_prop(border_prop)
+
+            # update background with frame info
+            if border_prop == 0.0:
+                background = frame
+            elif border_prop == 1.0:
+                background = np.zeros(shape=frame.shape, dtype=np.uint8)
+            else:
+                background = np.zeros(shape=frame.shape, dtype=np.uint8)
+
+                # tile background array with image
+                for _, cell in enumerate(self.cells):
+                    # tile background array with image
+                    background = cell.draw(frame, background)
+
+        elif self.style == 1:
+            # random translation effect
+            pass
         else:
-            background = np.zeros(shape=frame.shape, dtype=np.uint8)
-
-            # tile background array with image
-            for h in range(num_cells[0]):
-                for w in range(num_cells[1]):
-                    cell = cv2.getRectSubPix(
-                        frame,
-                        (num_pix_cell[1], num_pix_cell[0]),
-                        (centers[1][w], centers[0][h]))
-                    cell = cv2.resize(
-                        cell,
-                        (2 * num_pix_img_half[1] + 1,
-                         2 * num_pix_img_half[0] + 1),
-                        interpolation=cv2.INTER_LINEAR)
-                    background[
-                        centers[0][h] - num_pix_img_half[0]:
-                        centers[0][h] + num_pix_img_half[0] + 1,
-                        centers[1][w] - num_pix_img_half[1]:
-                        centers[1][w] + num_pix_img_half[1] + 1,
-                        :] = cell
-
-            # cell = cv2.getRectSubPix(
-            #     frame,
-            #     (int(im_width / 4), int(im_width / 4)),
-            #     (int(im_width / 2), int(im_height / 2)))
-            # background[0:cell.shape[0], 0:cell.shape[1], :] = cell
-            # background = cv2.resize(
-            #     cell,
-            #     (im_width, im_height),
-            #     interpolation=cv2.INTER_LINEAR)
+            raise NotImplementedError
 
         return background
 
