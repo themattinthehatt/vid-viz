@@ -207,8 +207,8 @@ class WindowServer(object):
         self.fr_count = 0
         for _, effect in enumerate(self.effects):
             effect.reset()
-        for _, effect in enumerate(self.postproc):
-            effect.reset()
+        # for _, effect in enumerate(self.postproc):
+        #     effect.reset()
 
         # free previous resources
         if self.source_type is 'cam' or self.source_type is 'video':

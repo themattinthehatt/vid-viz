@@ -364,7 +364,7 @@ class Cell(object):
     """Helper class for Grating class"""
 
     def __init__(self, num_pix_cell, num_pix_cell_half, border_prop,
-                 center, vel, frame_size=[0, 0]):
+                 center, vel, frame_size=[0, 0], use_full_frame=False):
         self.num_pix_cell = num_pix_cell
         self.num_pix_cell_half = num_pix_cell_half
         self.center = center
@@ -373,6 +373,7 @@ class Cell(object):
         self.border_prop = None
         self.update_border_prop(border_prop)
         self.frame_size = frame_size
+        self.use_full_frame = use_full_frame
 
     def update_border_prop(self, border_prop):
         self.border_prop = border_prop
@@ -380,20 +381,48 @@ class Cell(object):
             [int((self.num_pix_cell[0] * (1 - self.border_prop) // 2)),
              int((self.num_pix_cell[1] * (1 - self.border_prop) // 2))]
 
+    def update_position_lazy(self):
+        self.center[0] += self.vel[0]
+        self.center[1] += self.vel[1]
+        if self.center[0] + self.num_pix_cell_half[0] >= self.frame_size[0]:
+            self.center[0] = self.num_pix_cell_half[0] + 1
+        elif self.center[0] - self.num_pix_cell_half[0] <= 0:
+            self.center[0] = self.frame_size[0] - self.num_pix_cell_half[0] - 1
+        if self.center[1] + self.num_pix_cell_half[1] >= self.frame_size[1]:
+            self.center[1] = self.num_pix_cell_half[1] + 1
+        elif self.center[1] - self.num_pix_cell_half[1] <= 0:
+            self.center[1] = self.frame_size[1] - self.num_pix_cell_half[1] - 1
+
     def update_position(self):
         self.center[0] += self.vel[0]
         self.center[1] += self.vel[1]
         if self.center[0] + self.num_pix_cell_half[0] >= self.frame_size[0]:
-            self.center[0] = self.num_pix_img_half[0] + 1
+            # set position to border
+            self.center[0] = self.frame_size[0] - self.num_pix_cell_half[0]
+            # reverse vertical velocity
+            self.vel[0] *= -1
+        elif self.center[0] - self.num_pix_cell_half[0] <= 0:
+            self.center[0] = self.num_pix_cell_half[0] + 1
+            self.vel[0] *= -1
+
         if self.center[1] + self.num_pix_cell_half[1] >= self.frame_size[1]:
-            self.center[1] = self.num_pix_img_half[1] + 1
+            self.center[1] = self.frame_size[1] - self.num_pix_cell_half[1]
+            self.vel[1] *= -1
+        elif self.center[1] - self.num_pix_cell_half[1] <= 0:
+            self.center[1] = self.num_pix_cell_half[1] + 1
+            self.vel[1] *= -1
 
     def draw(self, frame, background):
 
-        cell = cv2.getRectSubPix(
-            frame,
-            (self.num_pix_cell[1], self.num_pix_cell[0]),
-            (self.center[1], self.center[0]))
+        if self.use_full_frame:
+            # render full frame in cell
+            cell = frame
+        else:
+            # render part of frame in cell
+            cell = cv2.getRectSubPix(
+                frame,
+                (self.num_pix_cell[1], self.num_pix_cell[0]),
+                (self.center[1], self.center[0]))
         cell = cv2.resize(
             cell,
             (2 * self.num_pix_img_half[1] + 1,
@@ -460,7 +489,7 @@ class Grating(Effect):
             'step': 1,
             'inc': False,
             'dec': False}
-        self.max_num_styles = 2
+        self.max_num_styles = 3
 
         # combine dicts into a list for easy general access
         self.props = [
@@ -504,8 +533,8 @@ class Grating(Effect):
         elif len(frame.shape) == 2:
             [im_height, im_width] = frame.shape
 
-        if self.style == 0:
-            # original grating style
+        if self.style == -1:
+            # original grating style; static vertical and horizontal black bars
 
             # reinitialize cells if number has changed
             if num_cells[0] * num_cells[1] != len(self.cells):
@@ -551,25 +580,45 @@ class Grating(Effect):
                     # tile background array with image
                     background = cell.draw(frame, background)
 
-        elif self.style == 1:
-            # random translation effect
+        elif self.style == 0 or self.style == 1 or self.style == 2:
+            # random horizontal translation effect
 
             # add cells if necessary
             while len(self.cells) < int(num_cells[1]):
                 # get initial values for cells
-                num_pix_cell_half = [np.random.randint(10, 30),
-                                     np.random.randint(10, 30)]
+                if self.style == 0:
+                    # render portion of frame in each cell
+                    use_full_frame = False
+                    num_pix_cell_half = [np.random.randint(10, 30),
+                                         np.random.randint(10, 30)]
+                    velocity = [0, np.random.randint(2, 20)]
+                elif self.style == 1:
+                    # render full frame in each (larger) cell
+                    use_full_frame = True
+                    num_pix_cell_half = [np.random.randint(50, 80),
+                                         np.random.randint(70, 90)]
+                    velocity = [0, np.random.randint(-10, 10)]
+                elif self.style == 2:
+                    use_full_frame = True
+                    num_pix_cell_half = [np.random.randint(50, 80),
+                                         np.random.randint(70, 90)]
+                    velocity = [np.random.randint(-5, 5),
+                                np.random.randint(-5, 5)]
+
                 num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
                                 int(2 * num_pix_cell_half[1] + 1)]
-                centers = [
-                    np.random.randint(num_pix_cell_half[0] + 1,
-                                      im_height - num_pix_cell_half[0]),
-                    np.random.randint(num_pix_cell_half[1] + 1,
-                                      im_width - num_pix_cell_half[1])]
-                velocity = [0, np.random.randint(1, 20)]
+                # use random portion of frame
+                lower_height = num_pix_cell_half[0] + 1;
+                upper_height = im_height - num_pix_cell_half[0] - 1
+                lower_width = num_pix_cell_half[1] + 1
+                upper_width = im_width - num_pix_cell_half[1] - 1
+                centers = [np.random.randint(lower_height, upper_height),
+                           np.random.randint(lower_width, upper_width)]
+
                 self.cells.append(Cell(
                     num_pix_cell, num_pix_cell_half, border_prop,
-                    centers, velocity, frame_size=[im_height, im_width]))
+                    centers, velocity, frame_size=[im_height, im_width],
+                    use_full_frame=use_full_frame))
             # delete cells if necessary
             while len(self.cells) > int(num_cells[1]):
                 del self.cells[-1]
@@ -586,7 +635,10 @@ class Grating(Effect):
             # tile background array with image
             for _, cell in enumerate(self.cells):
                 # update positions of cells
-                cell.update_position()
+                if self.style == 0 or self.style == 1:
+                    cell.update_position_lazy()
+                elif self.style == 2:
+                    cell.update_position()
                 # tile background array with image
                 background = cell.draw(frame, background)
 
