@@ -589,9 +589,13 @@ class Grating(Effect):
                 if self.style == 0:
                     # render portion of frame in each cell
                     use_full_frame = False
-                    num_pix_cell_half = [np.random.randint(10, 30),
-                                         np.random.randint(10, 30)]
-                    velocity = [0, np.random.randint(2, 20)]
+                    # num_pix_cell_half = [np.random.randint(10, 30),
+                    #                      np.random.randint(10, 30)]
+                    num_pix_cell_half = [np.random.randint(30, 50),
+                                         np.random.randint(30, 50)]
+                    # velocity = [0, np.random.randint(2, 20)]
+                    velocity = [np.random.randint(-20, 20),
+                                np.random.randint(-20, 20)]
                 elif self.style == 1:
                     # render full frame in each (larger) cell
                     use_full_frame = True
@@ -600,11 +604,13 @@ class Grating(Effect):
                     velocity = [0, np.random.randint(-10, 10)]
                 elif self.style == 2:
                     use_full_frame = True
-                    num_pix_cell_half = [np.random.randint(50, 80),
-                                         np.random.randint(70, 90)]
-                    velocity = [np.random.randint(-5, 5),
-                                np.random.randint(-5, 5)]
-
+                    # num_pix_cell_half = [np.random.randint(50, 80),
+                    #                      np.random.randint(70, 90)]
+                    num_pix_cell_half = [100, int(100 * 16 / 9)]
+                    # velocity = [np.random.randint(-5, 5),
+                    #             np.random.randint(-5, 5)]
+                    velocity = [np.random.randint(-8, 8),
+                                np.random.randint(-8, 8)]
                 num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
                                 int(2 * num_pix_cell_half[1] + 1)]
                 # use random portion of frame

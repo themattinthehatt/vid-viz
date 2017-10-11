@@ -242,7 +242,6 @@ class WindowServer(object):
                 self.total_frame_count = float('inf')
         else:
             raise TypeError('Invalid source_type')
-
         # display effect options to user
         self._display_options('effect')
 
