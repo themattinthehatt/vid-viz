@@ -11,12 +11,12 @@ from os.path import join, isfile
 import cv2
 import numpy as np
 
-import viztools as filters
+import effects
 import utils as util
 import cvutils as cvutil
 
 
-class HueSwirlChain(filters.Effect):
+class HueSwirlChain(effects.Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
     with iteratively applying blur kernels. Iterative blur occurs 
@@ -134,7 +134,7 @@ class HueSwirlChain(filters.Effect):
         self.frame_height = frame_height
 
         # get source images
-        source_dir = '/media/data/Dropbox/Git/vid-viz/data/deep-dream/'
+        source_dir = '/home/mattw/Dropbox/Dropbox/gihub/vid-viz/data/deep-dream/'
         self.file_list = [join(source_dir, f) for f in listdir(source_dir)
                           if isfile(join(source_dir, f))]
         self.num_files = len(self.file_list)

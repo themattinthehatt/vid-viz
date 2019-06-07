@@ -1,6 +1,8 @@
-"""Contains classes for windows using pyglet or OpenCV; functions initialize
+"""
+Contains classes for windows using pyglet or OpenCV; functions initialize
 window, render texture to window upon calls to a draw command, and handle 
-implementation-specific parsing of user input (just keyboard for now)"""
+implementation-specific parsing of user input (just keyboard for now)
+"""
 
 import numpy as np
 import ctypes
@@ -11,13 +13,13 @@ import cv2
 
 class MyWindow(object):
 
-    def set_image_data(self):
+    def set_image_data(self, image):
         raise NotImplementedError
 
     def on_draw(self):
         raise NotImplementedError
 
-    def on_key_press(self):
+    def on_key_press(self, *args):
         raise NotImplementedError
 
     def clear_key_press(self):

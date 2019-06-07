@@ -1,7 +1,8 @@
-"""vid-viz main loop using pyglet to handle window creation
+"""
+vid-viz main loop using pyglet to handle window creation
 
 KEYBOARD INPUTS:
-    number keys - choose effect (see viztools.py for detailed keyboard input 
+    number keys - choose effect (see effects.py for detailed keyboard input 
     for each effect)
         0 - thresholding
         1 - alien
@@ -27,8 +28,8 @@ import sys
 sys.path.append('lib/pyglet-1.2.4-py2.7.egg')
 import pyglet
 
-import src.window as win
-import src.windowserver as ws
+import vidviz.window as win
+import vidviz.windowserver as ws
 
 
 # general user parameters

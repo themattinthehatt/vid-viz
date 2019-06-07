@@ -1,4 +1,5 @@
 """Contains pyglet-specific utility functions"""
+
 # ----------------------------------------------------------------------------
 # pyglet
 # Copyright (c) 2006-2007 Alex Holkner
@@ -34,7 +35,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 # ----------------------------------------------------------------------------
 
-import numpy as np
 import ctypes
 import pyglet
 
@@ -70,8 +70,9 @@ def get_stride0(inter):
 
 
 class ArrayInterfaceImage(pyglet.image.ImageData):
-    def __init__(self,arr,format=None,allow_copy=True):
-        '''Initialize image data from the numpy array interface
+    def __init__(self, arr, format=None, allow_copy=True):
+        """
+        Initialize image data from the numpy array interface
         :Parameters:
             `arr` : array
                 data supporting the __array_interface__ protocol. If
@@ -88,7 +89,7 @@ class ArrayInterfaceImage(pyglet.image.ImageData):
                 unsuitable. In particular, the data must be C
                 contiguous in this case. If True (default), the data
                 may be copied to avoid such exceptions.
-        '''
+        """
 
         self.inter = arr.__array_interface__
         self.allow_copy = allow_copy

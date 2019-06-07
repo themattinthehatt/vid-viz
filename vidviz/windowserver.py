@@ -1,16 +1,18 @@
 import numpy as np
 import cv2
 
-import src.viztools as filters
-import src.utils as utils
-import src.cvutils as cvutils
-import src.auto as auto
+import vidviz.effects as effects
+import vidviz.utils as utils
+import vidviz.cvutils as cvutils
+import vidviz.auto as auto
 
 
 class WindowServer(object):
-    """WindowServer object controls loading/generation of source frame, 
+    """
+    WindowServer object controls loading/generation of source frame, 
     processes the frame, and then returns the frame as a numpy array to be 
-    rendered in the active window"""
+    rendered in the active window
+    """
 
     def __init__(self, window_width=100, window_height=100, formats='RGB'):
 
@@ -20,25 +22,25 @@ class WindowServer(object):
 
         # initialize effect objects
         self.effects = [
-            filters.Threshold(),
-            filters.Alien(),
-            filters.RGBWalk(),
-            filters.RGBBurst(),
-            filters.HueBloom(),
-            filters.HueSwirl(),
-            filters.HueSwirlMover()
+            effects.Threshold(),
+            effects.Alien(),
+            effects.RGBWalk(),
+            effects.RGBBurst(),
+            effects.HueBloom(),
+            effects.HueSwirl(),
+            effects.HueSwirlMover()
         ]
         self.effect_index = None
         self.num_effects = len(self.effects)
 
         # initialize post-processing objects
         self.postproc = [
-            filters.Border(style='postproc'),
-            filters.Grating(style='postproc'),
+            effects.Border(style='postproc'),
+            effects.Grating(style='postproc'),
         ]
         self.postproc_index = None
         self.num_postproc = len(self.postproc)
-        self.post_process_pre = False  # post-proc pre/proceeds other effects
+        self.is_post_process_pre = False  # post-proc pre/proceeds other effects
 
         self.mode = 'effect'  # define active mode; 'effect' | 'postproc'
         # get source material meta-data
@@ -46,7 +48,7 @@ class WindowServer(object):
         self.source_list = utils.get_sources()
         self.source_type = None
         self.num_sources = len(self.source_list)
-        self.new_source = True
+        self.is_new_source = True
 
         # keep track of keyboard input
         self.key = 0
@@ -66,7 +68,7 @@ class WindowServer(object):
         self._process_io()
 
         # load new source
-        if self.new_source:
+        if self.is_new_source:
             self._load_new_source()
 
         # get frame and relevant info
@@ -83,6 +85,8 @@ class WindowServer(object):
                 # active auto mode
                 frame = self.auto_effect.process(self.key_list)
                 self.auto_effect.print_update()
+        else:
+            raise ValueError('%s is an invalid source type' % self.source_type)
 
         # get uniform frame sizes; 'auto' and 'gen' resize on their own
         if self.source_type is not 'auto' and self.source_type is not 'gen':
@@ -97,8 +101,7 @@ class WindowServer(object):
                 if self.key == ord(str(num)):
                     self.effect_index = num
                     # print first update
-                    self.effects[self.effect_index].print_update(
-                        force=True)
+                    self.effects[self.effect_index].print_update(force=True)
                     self.key_list[self.key] = False
 
         # update current post-processing effect
@@ -112,7 +115,7 @@ class WindowServer(object):
                     self.key_list[self.key] = False
 
         # apply borders before effect
-        if self.post_process_pre and self.postproc_index is not None:
+        if self.is_post_process_pre and self.postproc_index is not None:
             if self.mode == 'postproc':
                 # active post-process mode
                 frame = self.postproc[self.postproc_index].process(
@@ -136,7 +139,7 @@ class WindowServer(object):
                     frame, self.key_list, key_lock=True)
 
         # apply borders after effect
-        if not self.post_process_pre and self.postproc_index is not None:
+        if not self.is_post_process_pre and self.postproc_index is not None:
             if self.mode == 'postproc':
                 # active post-process mode
                 frame = self.postproc[self.postproc_index].process(
@@ -193,16 +196,16 @@ class WindowServer(object):
                 self._display_options('postproc')
         elif self.key_list[ord(' ')]:
             self.source_index = (self.source_index + 1) % self.num_sources
-            self.new_source = True
+            self.is_new_source = True
         elif self.key_list[ord('\t')]:
             # only change post-processing order if in post-process mode
             if self.mode == 'postproc':
-                self.post_process_pre = not self.post_process_pre
+                self.is_post_process_pre = not self.is_post_process_pre
 
     def _load_new_source(self):
 
         # reset necessary parameters
-        self.new_source = False
+        self.is_new_source = False
         self.effect_index = None
         self.fr_count = 0
         for _, effect in enumerate(self.effects):
@@ -229,6 +232,7 @@ class WindowServer(object):
             self.frame_mask = None
         elif self.source_type is 'image':
             self.frame_orig = cv2.imread(source_loc)
+            print(self.frame_orig.shape)
             self.total_frame_count = float('inf')
             self.frame_mask = np.copy(self.frame_orig)
         elif self.source_type is 'auto':

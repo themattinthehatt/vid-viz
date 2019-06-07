@@ -1,4 +1,5 @@
-"""Library of simple image processing effects that can be applied to source 
+"""
+Library of simple image processing effects that can be applied to source 
 images or video
 """
 
@@ -16,6 +17,10 @@ class Effect(object):
     """Base class for vid-viz effects"""
 
     def __init__(self, style='effect'):
+        """
+        Args:
+            style (str): 'effect' | 'postproc'
+        """
 
         # set attributes common to all effects
         self.name = None
@@ -160,19 +165,18 @@ class Effect(object):
                        self.props[index]['val'],
                        self.props[index]['max'],
                        self.props[index]['desc']))
-            self.print_extra_updates()
 
-    def print_extra_updates(self):
-        print('t - toggle between effect types')
-        print('w - toggle random walk')
-        print('/ - reset effect parameters')
-        print('q - quit %s effect' % self.name)
-        if self.type == 'effect':
-            print('~ - enable post-processing edit mode')
-            print('spacebar - cycle through sources')
-        elif self.type == 'postproc':
-            print('tab - reverse processing order')
-            print('backspace - quit post-processing edit mode')
+            # print extra updates
+            print('t - toggle between effect types')
+            print('w - toggle random walk')
+            print('/ - reset effect parameters')
+            print('q - quit %s effect' % self.name)
+            if self.type == 'effect':
+                print('~ - enable post-processing edit mode')
+                print('spacebar - cycle through sources')
+            elif self.type == 'postproc':
+                print('tab - reverse processing order')
+                print('backspace - quit post-processing edit mode')
 
     def reset(self):
         for index, _ in enumerate(self.props):
