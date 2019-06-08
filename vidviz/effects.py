@@ -108,9 +108,9 @@ class Effect(object):
             key_list[ord('t')] = False
             self.style = (self.style + 1) % self.max_num_styles
             # self.reinitialize = True
-        elif key_list[ord('a')]:
-            key_list[ord('a')] = False
-            self.auto_play = not self.auto_play
+        # elif key_list[ord('a')]:
+        #     key_list[ord('a')] = False
+        #     self.auto_play = not self.auto_play
         elif key_list[ord('w')]:
             key_list[ord('w')] = False
             self.random_walk = not self.random_walk
@@ -662,7 +662,7 @@ class Grating(Effect):
         self.cells = []
 
 
-class Threshold(Effect):
+class AdaptiveThreshold(Effect):
     """
     Threshold individual channels in RGB frame
     
@@ -811,6 +811,140 @@ class Threshold(Effect):
         super(Threshold, self).reset()
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]            # effect selector for each chan
+
+
+class SoftThreshold(Effect):
+    """
+    Threshold individual channels in RGB frame
+
+    KEYBOARD INPUTS:
+        t - toggle threshold type (apply inverse threshold)
+        -/+ - decrease/increase threshold
+        [/] - None
+        ;/' - None
+        ,/. - None
+        r/g/b/a - select red/green/blue/all channels for further processing
+        / - reset parameters
+        q - quit soft threshold effect
+    """
+
+    def __init__(self, style='effect'):
+
+        super(SoftThreshold, self).__init__(style=style)
+        self.name = 'soft-threshold'
+
+        # user option constants
+        THRESHOLD = {
+            'desc': 'threshold value',
+            'name': 'threshold',
+            'val': 128,
+            'init': 128,
+            'min': 0,
+            'max': 255,
+            'mod': self.inf,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2  # thresh_binary, thresh_binary_inv
+
+        # combine dicts into a list for easy general access
+        self.props = [
+            THRESHOLD,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
+
+        # other user options
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]  # effect selector for each chan
+        self.max_NUM_CHAN_STYLES = 5
+
+        # opencv parameters
+        self.THRESH_TYPE = cv2.THRESH_BINARY
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+            if key_list[ord('b')]:
+                key_list[ord('b')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = False
+                self.use_chan[2] = False
+            elif key_list[ord('g')]:
+                key_list[ord('g')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = True
+                self.use_chan[2] = False
+            elif key_list[ord('r')]:
+                key_list[ord('r')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = False
+                self.use_chan[2] = True
+            elif key_list[ord('a')]:
+                key_list[ord('a')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = True
+                self.use_chan[2] = True
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
+
+        # human-readable names
+        threshold = self.props[0]['val']
+
+        for chan_style in range(self.max_NUM_CHAN_STYLES):
+            if key_list[ord(str(chan_style))]:
+                for chan in range(3):
+                    if self.use_chan[chan]:
+                        self.chan_style[chan] = chan_style
+                key_list[ord(str(chan_style))] = False
+
+        # process image
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        if self.style == 0:
+            self.THRESH_TYPE = cv2.THRESH_BINARY
+        elif self.style == 1:
+            self.THRESH_TYPE = cv2.THRESH_BINARY_INV
+        _, frame_thresh = cv2.threshold(
+            frame_gray,
+            threshold,
+            255,
+            self.THRESH_TYPE)
+
+        for chan in range(3):
+            if self.chan_style[chan] == 1:
+                frame[:, :, chan] = 0
+            elif self.chan_style[chan] == 2:
+                frame[:, :, chan] = 255
+            elif self.chan_style[chan] == 3:
+                frame[:, :, chan] = frame_thresh
+            elif self.chan_style[chan] == 4:
+                frame[:, :, chan] = frame_gray
+
+        return frame
+
+    def reset(self):
+        super(SoftThreshold, self).reset()
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]  # effect selector for each chan
 
 
 class Alien(Effect):

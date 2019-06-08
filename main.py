@@ -4,7 +4,7 @@ vid-viz main loop using pyglet to handle window creation
 KEYBOARD INPUTS:
     number keys - choose effect (see effects.py for detailed keyboard input 
     for each effect)
-        0 - thresholding
+        0 - adaptive thresholding
         1 - alien
         2 - rgbwalk
         3 - rgbburst

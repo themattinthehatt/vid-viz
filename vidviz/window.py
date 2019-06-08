@@ -241,8 +241,8 @@ class MyWindowOCV(MyWindow):
     def on_draw(self):
         if self.fullscreen:
             cv2.namedWindow(self.name, cv2.WND_PROP_FULLSCREEN)
-            cv2.setWindowProperty(self.name, cv2.WND_PROP_FULLSCREEN,
-                                  cv2.WINDOW_FULLSCREEN)
+            cv2.setWindowProperty(
+                self.name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
             cv2.imshow(self.name, self.image_data)
         else:
             cv2.imshow(self.name, self.image_data)

@@ -22,7 +22,7 @@ class WindowServer(object):
 
         # initialize effect objects
         self.effects = [
-            effects.Threshold(),
+            effects.SoftThreshold(),
             effects.Alien(),
             effects.RGBWalk(),
             effects.RGBBurst(),
