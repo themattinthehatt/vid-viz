@@ -1,0 +1,25 @@
+general
+    - update to python 3
+
+effects.py
+    - update print output to be more verbose
+    - fix PowerThreshold
+    - GIMP effects to check out
+        - lens effect
+        - emboss
+        - IWarp swirl
+        - mosaic
+        - ripples (magnitude/period/phase follows random walk/music)
+        - waves (magnitude/period/phase follows random walk/music)
+        - shift rows (magnitude follows random walk/music)
+        - neon edge detect
+        - cartoon
+        - glass tile
+        - photocopy
+        - predator
+
+auto.py
+    - ShiftingSheets
+
+gen
+    - BallBounce (+HueSwirlMover)

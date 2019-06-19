@@ -415,10 +415,10 @@ class HueSwirlChain(effects.Effect):
         # _, frame = cv2.threshold(frame, 32, 255, cv2.THRESH_BINARY)
         return frame
 
-    def print_update(self):
+    def print_update(self, force=False):
         """Print effect settings to console if not changed automatically"""
         if (self.update_output != 4) and (self.update_output != 5):
-            super(HueSwirlChain, self).print_update()
+            super(HueSwirlChain, self).print_update(force=force)
 
     def print_extra_updates(self):
         print('q - quit %s effect' % self.name)

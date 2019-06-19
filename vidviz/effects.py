@@ -683,7 +683,7 @@ class AdaptiveThreshold(Effect):
 
     def __init__(self, style='effect'):
 
-        super(Threshold, self).__init__(style=style)
+        super(AdaptiveThreshold, self).__init__(style=style)
         self.name = 'threshold'
 
         # user option constants
@@ -808,12 +808,12 @@ class AdaptiveThreshold(Effect):
         return frame
 
     def reset(self):
-        super(Threshold, self).reset()
+        super(AdaptiveThreshold, self).reset()
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]            # effect selector for each chan
 
 
-class SoftThreshold(Effect):
+class SimpleThreshold(Effect):
     """
     Threshold individual channels in RGB frame
 
@@ -830,7 +830,7 @@ class SoftThreshold(Effect):
 
     def __init__(self, style='effect'):
 
-        super(SoftThreshold, self).__init__(style=style)
+        super(SimpleThreshold, self).__init__(style=style)
         self.name = 'soft-threshold'
 
         # user option constants
@@ -942,7 +942,168 @@ class SoftThreshold(Effect):
         return frame
 
     def reset(self):
-        super(SoftThreshold, self).reset()
+        super(SimpleThreshold, self).reset()
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]  # effect selector for each chan
+
+
+class PowerThreshold(Effect):
+    """
+    Threshold individual channels in RGB frame
+
+    KEYBOARD INPUTS:
+        t - toggle threshold type (apply inverse threshold)
+        -/+ - decrease/increase threshold
+        [/] - None
+        ;/' - None
+        ,/. - None
+        r/g/b/a - select red/green/blue/all channels for further processing
+        / - reset parameters
+        q - quit soft threshold effect
+    """
+
+    def __init__(self, style='effect'):
+
+        super(PowerThreshold, self).__init__(style=style)
+        self.name = 'power-threshold'
+
+        # user option constants
+        THRESHOLD = {
+            'desc': 'threshold value',
+            'name': 'threshold',
+            'val': 128,
+            'init': 128,
+            'min': 0,
+            'max': 255,
+            'mod': self.inf,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        THRESHOLD_POWER = {
+            'desc': 'threshold power',
+            'name': 'threshold_power',
+            'val': 1,
+            'init': 1,
+            'min': 1,
+            'max': 5,
+            'mod': self.inf,
+            'step': 0.01,
+            'inc': False,
+            'dec': False}
+        self.max_num_styles = 2  # thresh_binary, thresh_binary_inv
+
+        # combine dicts into a list for easy general access
+        self.props = [
+            THRESHOLD,
+            THRESHOLD_POWER,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
+
+        # user options
+        self.style = 0
+        self.reinitialize = False
+        self.random_walk = False  # TODO - walk through power space
+        self.chan_vec_pos = np.zeros((3, 2))
+        self.noise = util.SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
+
+        # other user options
+        self.use_chan = [False, False, False]  # rgb channel selector
+        self.chan_style = [0, 0, 0]  # effect selector for each chan
+        self.max_NUM_CHAN_STYLES = 5
+
+        # opencv parameters
+        self.THRESH_TYPE = cv2.THRESH_BINARY
+
+    def process(self, frame, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+            if key_list[ord('b')]:
+                key_list[ord('b')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = False
+                self.use_chan[2] = False
+            elif key_list[ord('g')]:
+                key_list[ord('g')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = True
+                self.use_chan[2] = False
+            elif key_list[ord('r')]:
+                key_list[ord('r')] = False
+                self.use_chan[0] = False
+                self.use_chan[1] = False
+                self.use_chan[2] = True
+            elif key_list[ord('a')]:
+                key_list[ord('a')] = False
+                self.use_chan[0] = True
+                self.use_chan[1] = True
+                self.use_chan[2] = True
+
+        if self.reinitialize:
+            self.reinitialize = False
+            self.chan_vec_pos = np.zeros((3, 2))
+            self.noise.reinitialize()
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
+
+        # human-readable names
+        threshold = self.props[0]['val']
+        power = self.props[1]['val']
+
+        for chan_style in range(self.max_NUM_CHAN_STYLES):
+            if key_list[ord(str(chan_style))]:
+                for chan in range(3):
+                    if self.use_chan[chan]:
+                        self.chan_style[chan] = chan_style
+                key_list[ord(str(chan_style))] = False
+
+        # process image
+        frame_ = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        frame_gray = cv2.GaussianBlur(frame_, (5, 5), 0)
+
+        # only perform threshold if necessary
+        if any([cs == 3 for cs in self.chan_style]):
+            if self.style == 0:
+                # thresh binary
+                pass
+            elif self.style == 1:
+                frame_gray = 255 - frame_gray
+
+            # convert to image to [0, 1] range
+            frame_gray_fl = frame_gray.astype('float16') / 255.0
+            frame_thresh = np.copy(frame_gray_fl)
+
+            mask = frame_thresh < (threshold / 255.0)
+            # 0-thresh range: [0, thresh]**power
+            frame_thresh[mask] = np.power(frame_gray_fl[mask], power)
+            # thresh-1 range: 1-(1-[thresh, 1])**power
+            frame_thresh[~mask] = 1.0 - np.power(
+                1.0 - frame_gray_fl[~mask], power)
+            # convert image to [0, 255] range
+            frame_thresh *= 255
+            frame_thresh = frame_thresh.astype('uint8')
+        else:
+            frame_thresh = 0
+
+        for chan in range(3):
+            if self.chan_style[chan] == 1:
+                frame[:, :, chan] = 0
+            elif self.chan_style[chan] == 2:
+                frame[:, :, chan] = 255
+            elif self.chan_style[chan] == 3:
+                frame[:, :, chan] = frame_thresh
+            elif self.chan_style[chan] == 4:
+                frame[:, :, chan] = frame_gray
+
+        return frame
+
+    def reset(self):
+        super(PowerThreshold, self).reset()
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]  # effect selector for each chan
 
@@ -1094,7 +1255,7 @@ class Alien(Effect):
                                                        self.chan_freq[chan] +
                                                        self.chan_phase[chan])
 
-        frame = frame.astype(np.uint8)
+        frame = frame.astype('uint8')
 
         return frame
 
@@ -1685,8 +1846,8 @@ class HueSwirl(Effect):
             'name': 'mask_offset',
             'val': 255,
             'init': 255,
-            'min': -self.inf,
-            'max': self.inf,
+            'min': 0,
+            'max': 255,
             'mod': 255,
             'step': 5,
             'inc': False,
