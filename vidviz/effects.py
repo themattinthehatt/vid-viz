@@ -9,8 +9,7 @@ from __future__ import division
 import cv2
 import numpy as np
 
-import utils as util
-import cvutils
+from vidviz.utils import SmoothNoise
 
 
 class Effect(object):
@@ -32,7 +31,7 @@ class Effect(object):
         self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=1,
             num_channels=self.chan_vec_pos.size)
         self.update_output = False  # boolean for updating screen output
@@ -544,10 +543,12 @@ class Grating(Effect):
             if num_cells[0] * num_cells[1] != len(self.cells):
 
                 # get initial values for cells
-                num_pix_cell_half = [(im_height / num_cells[0]) // 2,
-                                     (im_width / num_cells[1]) // 2]
-                num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
-                                int(2 * num_pix_cell_half[1] + 1)]
+                num_pix_cell_half = [
+                    (im_height / num_cells[0]) // 2,
+                    (im_width / num_cells[1]) // 2]
+                num_pix_cell = [
+                    int(2 * num_pix_cell_half[0] + 1),
+                    int(2 * num_pix_cell_half[1] + 1)]
                 centers = [
                     [int(val * num_pix_cell[0] + num_pix_cell_half[0] + 1)
                         for val in range(num_cells[0])],
@@ -595,16 +596,19 @@ class Grating(Effect):
                     use_full_frame = False
                     # num_pix_cell_half = [np.random.randint(10, 30),
                     #                      np.random.randint(10, 30)]
-                    num_pix_cell_half = [np.random.randint(30, 50),
-                                         np.random.randint(30, 50)]
+                    num_pix_cell_half = [
+                        np.random.randint(30, 50),
+                        np.random.randint(30, 50)]
                     # velocity = [0, np.random.randint(2, 20)]
-                    velocity = [np.random.randint(-20, 20),
-                                np.random.randint(-20, 20)]
+                    velocity = [
+                        np.random.randint(-20, 20),
+                        np.random.randint(-20, 20)]
                 elif self.style == 1:
                     # render full frame in each (larger) cell
                     use_full_frame = True
-                    num_pix_cell_half = [np.random.randint(50, 80),
-                                         np.random.randint(70, 90)]
+                    num_pix_cell_half = [
+                        np.random.randint(50, 80),
+                        np.random.randint(70, 90)]
                     velocity = [0, np.random.randint(-10, 10)]
                 elif self.style == 2:
                     use_full_frame = True
@@ -613,12 +617,14 @@ class Grating(Effect):
                     num_pix_cell_half = [100, int(100 * 16 / 9)]
                     # velocity = [np.random.randint(-5, 5),
                     #             np.random.randint(-5, 5)]
-                    velocity = [np.random.randint(-8, 8),
-                                np.random.randint(-8, 8)]
-                num_pix_cell = [int(2 * num_pix_cell_half[0] + 1),
-                                int(2 * num_pix_cell_half[1] + 1)]
+                    velocity = [
+                        np.random.randint(-8, 8),
+                        np.random.randint(-8, 8)]
+                num_pix_cell = [
+                    int(2 * num_pix_cell_half[0] + 1),
+                    int(2 * num_pix_cell_half[1] + 1)]
                 # use random portion of frame
-                lower_height = num_pix_cell_half[0] + 1;
+                lower_height = num_pix_cell_half[0] + 1
                 upper_height = im_height - num_pix_cell_half[0] - 1
                 lower_width = num_pix_cell_half[1] + 1
                 upper_width = im_width - num_pix_cell_half[1] - 1
@@ -725,7 +731,7 @@ class AdaptiveThreshold(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -733,7 +739,7 @@ class AdaptiveThreshold(Effect):
         self.optimize = 1                       # skips a smoothing step
         self.use_chan = [False, False, False]   # rgb channel selector
         self.chan_style = [0, 0, 0]             # effect selector for each chan
-        self.max_NUM_CHAN_STYLES = 4
+        self.MAX_NUM_CHAN_STYLES = 4
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
@@ -773,7 +779,7 @@ class AdaptiveThreshold(Effect):
 
         for chan in range(3):
             if self.use_chan[chan]:
-                for chan_style in range(self.max_NUM_CHAN_STYLES):
+                for chan_style in range(self.MAX_NUM_CHAN_STYLES):
                     if key_list[ord(str(chan_style))]:
                         self.chan_style[chan] = chan_style
                         key_list[ord(str(chan_style))] = False
@@ -861,14 +867,14 @@ class SimpleThreshold(Effect):
         self.reinitialize = False
         self.random_walk = False
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
         # other user options
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]  # effect selector for each chan
-        self.max_NUM_CHAN_STYLES = 5
+        self.MAX_NUM_CHAN_STYLES = 5
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
@@ -909,7 +915,7 @@ class SimpleThreshold(Effect):
         # human-readable names
         threshold = self.props[0]['val']
 
-        for chan_style in range(self.max_NUM_CHAN_STYLES):
+        for chan_style in range(self.MAX_NUM_CHAN_STYLES):
             if key_list[ord(str(chan_style))]:
                 for chan in range(3):
                     if self.use_chan[chan]:
@@ -976,7 +982,7 @@ class PowerThreshold(Effect):
             'min': 0,
             'max': 255,
             'mod': self.inf,
-            'step': 1,
+            'step': 5,
             'inc': False,
             'dec': False}
         THRESHOLD_POWER = {
@@ -987,7 +993,7 @@ class PowerThreshold(Effect):
             'min': 1,
             'max': 5,
             'mod': self.inf,
-            'step': 0.01,
+            'step': 0.05,
             'inc': False,
             'dec': False}
         self.max_num_styles = 2  # thresh_binary, thresh_binary_inv
@@ -1006,14 +1012,14 @@ class PowerThreshold(Effect):
         self.reinitialize = False
         self.random_walk = False  # TODO - walk through power space
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
         # other user options
         self.use_chan = [False, False, False]  # rgb channel selector
         self.chan_style = [0, 0, 0]  # effect selector for each chan
-        self.max_NUM_CHAN_STYLES = 5
+        self.MAX_NUM_CHAN_STYLES = 5
 
         # opencv parameters
         self.THRESH_TYPE = cv2.THRESH_BINARY
@@ -1055,7 +1061,7 @@ class PowerThreshold(Effect):
         threshold = self.props[0]['val']
         power = self.props[1]['val']
 
-        for chan_style in range(self.max_NUM_CHAN_STYLES):
+        for chan_style in range(self.MAX_NUM_CHAN_STYLES):
             if key_list[ord(str(chan_style))]:
                 for chan in range(3):
                     if self.use_chan[chan]:
@@ -1170,7 +1176,7 @@ class Alien(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -1186,7 +1192,7 @@ class Alien(Effect):
             self.props[1]['init'],
             self.props[1]['init'],
             self.props[1]['init']]
-        self.max_NUM_CHAN_STYLES = 4
+        self.MAX_NUM_CHAN_STYLES = 4
 
     def process(self, frame, key_list, key_lock=False):
 
@@ -1219,7 +1225,7 @@ class Alien(Effect):
         for chan in range(3):
             if self.use_chan[chan]:
                 # update channel style
-                for chan_style in range(self.max_NUM_CHAN_STYLES):
+                for chan_style in range(self.MAX_NUM_CHAN_STYLES):
                     if key_list[ord(str(chan_style))]:
                         self.chan_style[chan] = chan_style
                         key_list[ord(str(chan_style))] = False
@@ -1322,7 +1328,7 @@ class RGBWalk(Effect):
         self.reinitialize = False           # reset random walk
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -1465,7 +1471,7 @@ class RGBBurst(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((3, 2))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -1620,7 +1626,7 @@ class HueBloom(Effect):
             'desc': 'dimension of random matrix height/width',
             'name': 'dim_size',
             'val': 10,
-            'init': 10,
+            'init': 2,
             'min': 2,
             'max': 100,
             'mod': self.inf,
@@ -1665,7 +1671,7 @@ class HueBloom(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -1880,7 +1886,7 @@ class HueSwirl(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -2199,7 +2205,7 @@ class HueSwirlMover(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -2440,7 +2446,7 @@ class HueCrusher(Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 

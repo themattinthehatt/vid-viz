@@ -1,10 +1,9 @@
 import numpy as np
 import cv2
-
+import os
 import vidviz.effects as effects
-import vidviz.utils as utils
-import vidviz.cvutils as cvutils
 import vidviz.auto as auto
+import vidviz.utils as utils
 
 
 class WindowServer(object):
@@ -22,7 +21,7 @@ class WindowServer(object):
 
         # initialize effect objects
         self.effects = [
-            effects.PowerThreshold(),
+            effects.AdaptiveThreshold(),
             effects.Alien(),
             effects.RGBWalk(),
             effects.RGBBurst(),
@@ -45,7 +44,7 @@ class WindowServer(object):
         self.mode = 'effect'  # define active mode; 'effect' | 'postproc'
         # get source material meta-data
         self.source_index = 0
-        self.source_list = utils.get_sources()
+        self.source_list = self._get_sources()
         self.source_type = None
         self.num_sources = len(self.source_list)
         self.is_new_source = True
@@ -72,12 +71,12 @@ class WindowServer(object):
             self._load_new_source()
 
         # get frame and relevant info
-        if self.source_type is 'cam' or self.source_type is 'video':
+        if self.source_type == 'cam' or self.source_type == 'video':
             ret, frame = self.cap.read()
-        elif self.source_type is 'image':
+        elif self.source_type == 'image':
             frame = np.copy(self.frame_orig)
             # frame = self.frame_orig
-        elif self.source_type is 'auto':
+        elif self.source_type == 'auto':
             if self.mode == 'postproc':
                 # passive auto mode
                 frame = self.auto_effect.process(self.key_list, key_lock=True)
@@ -88,11 +87,11 @@ class WindowServer(object):
         else:
             raise ValueError('%s is an invalid source type' % self.source_type)
 
-        # get uniform frame sizes; 'auto' and 'gen' resize on their own
-        if self.source_type is not 'auto' and self.source_type is not 'gen':
+        # get uniform frame sizes; 'auto' resize on their own
+        if self.source_type != 'auto':
             if frame is None:
-                raise TypeError('Frame is NoneType??')
-            frame = cvutils.resize(
+                frame = np.zeros((2, 2), dtype='uint8')
+            frame = utils.resize(
                 frame, self.window_width, self.window_height)
 
         # update current effect
@@ -127,7 +126,7 @@ class WindowServer(object):
                     frame, self.key_list, key_lock=True)
 
         # process frame
-        if self.source_type is not 'auto' and self.effect_index is not None:
+        if self.source_type != 'auto' and self.effect_index is not None:
             if self.mode == 'effect':
                 # active process mode
                 frame = self.effects[self.effect_index].process(
@@ -172,6 +171,7 @@ class WindowServer(object):
             if self.mode == 'effect' and self.effect_index is not None:
                 print('Quitting %s effect\n' %
                       self.effects[self.effect_index].name)
+                # reset params?
                 self._display_options('effect')
                 self.effect_index = None
             elif self.mode == 'postproc' and self.postproc_index is not None:
@@ -202,6 +202,54 @@ class WindowServer(object):
             if self.mode == 'postproc':
                 self.is_post_process_pre = not self.is_post_process_pre
 
+    @classmethod
+    def _get_sources(cls):
+        # file_type options : 'cam' | 'video' | 'image' | 'auto'
+
+        proj_dir = '/home/mattw/Dropbox/Dropbox/github/vid-viz/data'
+
+        source_list = []
+
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'tree-00.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'water-01.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-04.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'snowflake-02.mp4'),
+        #     'file_type': 'video'})
+        # source_list.append({
+        #     'file_loc': 'webcam',
+        #     'file_type': 'cam'})
+        # source_list.append({
+        #     'file_loc': auto.HueSwirlChain,
+        #     'file_type': 'auto'})
+        source_list.append({
+            'file_loc': auto.BouncingBalls,
+            'file_type': 'auto'})
+
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-00.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-01.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-02.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-03.jpg'),
+        #     'file_type': 'image'})
+        # source_list.append({
+        #     'file_loc': os.path.join(proj_dir, 'waves-05.jpg'),
+        #     'file_type': 'image'})
+
+        return source_list
+
     def _load_new_source(self):
 
         # reset necessary parameters
@@ -214,36 +262,32 @@ class WindowServer(object):
         #     effect.reset()
 
         # free previous resources
-        if self.source_type is 'cam' or self.source_type is 'video':
+        if self.source_type == 'cam' or self.source_type == 'video':
             self.cap.release()
 
         # load source
         self.source_type = self.source_list[self.source_index]['file_type']
         source_loc = self.source_list[self.source_index]['file_loc']
         print('Loading %s' % source_loc)
-        if self.source_type is 'cam':
+        if self.source_type == 'cam':
             self.cap = cv2.VideoCapture(0)
             self.total_frame_count = float('inf')
             self.frame_mask = None
-        elif self.source_type is 'video':
+        elif self.source_type == 'video':
             self.cap = cv2.VideoCapture(source_loc)
             self.total_frame_count = \
                 int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.frame_mask = None
-        elif self.source_type is 'image':
+        elif self.source_type == 'image':
             self.frame_orig = cv2.imread(source_loc)
             print(self.frame_orig.shape)
             self.total_frame_count = float('inf')
             self.frame_mask = np.copy(self.frame_orig)
-        elif self.source_type is 'auto':
-            if source_loc is 'hueswirlchain':
-                self.auto_effect = auto.HueSwirlChain(
-                    self.window_width, self.window_height)
-                self.auto_effect.update_output = 1  # force output
-                self.auto_effect.print_update()
-            else:
-                print('Invalid auto effect')
-                self.total_frame_count = float('inf')
+        elif self.source_type == 'auto':
+            self.auto_effect = source_loc(
+                self.window_height, self.window_width)
+            self.auto_effect.update_output = 1  # force output
+            self.auto_effect.print_update()
         else:
             raise TypeError('Invalid source_type')
         # display effect options to user

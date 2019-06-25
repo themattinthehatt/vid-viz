@@ -1,9 +1,8 @@
 """Contains general utility functions"""
 
 from __future__ import division
-
-import os
 import numpy as np
+import cv2
 
 
 class SmoothNoise(object):
@@ -43,44 +42,50 @@ class SmoothNoise(object):
             np.mean(self.noise_samples, axis=0)
 
 
-def get_sources():
-    # file_type options : 'cam' | 'video' | 'image' | 'auto'
+def resize(frame, frame_width, frame_height, interpolation=cv2.INTER_LINEAR):
+    """
+    Function to resize a given frame while maintaining the original aspect 
+    ratio
 
-    proj_dir = '/home/mattw/Dropbox/Dropbox/github/vid-viz/data'
+    Args:
+        frame (numpy array): frame to be resized
+        frame_width (int): desired frame width
+        frame_height (int): desired frame height
+        interpolation (OpenCV option)
+            cv2.INTER_LINEAR | cv2.INTER_CUBIC
 
-    source_list = []
+    Returns:
+        numpy array: updated frame
 
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/snowflake-02.mp4',
-    #     'file_type': 'video'})
-    source_list.append({
-        'file_loc': os.path.join(proj_dir, 'tree-00.jpg'),
-        'file_type': 'image'})
-    source_list.append({
-        'file_loc': os.path.join(proj_dir, 'honeycomb-00.jpg'),
-        'file_type': 'image'})
-    source_list.append({
-        'file_loc': 'webcam',
-        'file_type': 'cam'})
-    # source_list.append({
-    #     'file_loc': 'hueswirlchain',
-    #     'file_type': 'auto'})
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-00.jpg',
-    #     'file_type': 'image'})
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-01.jpg',
-    #     'file_type': 'image'})
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-02.jpg',
-    #     'file_type': 'image'})
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-03.jpg',
-    #     'file_type': 'image'})
-    source_list.append({
-        'file_loc': os.path.join(proj_dir, 'waves-04.jpg'),
-        'file_type': 'image'})
-    # source_list.append({
-    #     'file_loc': '/media/data/Dropbox/Git/vid-viz/data/waves-05.jpg',
-    #     'file_type': 'image'})
-    return source_list
+    """
+
+    dims_og = frame.shape
+
+    # crop current frame so that it has desired aspect ratio
+    aspect_og = dims_og[1] / dims_og[0]
+    aspect_final = frame_width / frame_height
+
+    if aspect_final >= aspect_og:
+        # frame is too tall and skinny; keep width
+        # get target height
+        height_new = int(dims_og[1] * frame_height / frame_width)
+        frame = cv2.getRectSubPix(
+            frame,
+            (dims_og[1], height_new),
+            (dims_og[1] / 2, dims_og[0] / 2))
+    else:
+        # frame is too short and fat; keep height
+        # get target width
+        width_new = int(dims_og[0] * frame_width / frame_height)
+        frame = cv2.getRectSubPix(
+            frame,
+            (width_new, dims_og[0]),
+            (dims_og[1] / 2, dims_og[0] / 2))
+
+    # resize frame
+    frame = cv2.resize(
+        frame,
+        (frame_width, frame_height),
+        interpolation=interpolation)
+
+    return frame

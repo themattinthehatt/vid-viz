@@ -1,9 +1,8 @@
 general
-    - update to python 3
+    - update to python 3...
 
 effects.py
     - update print output to be more verbose
-    - fix PowerThreshold
     - GIMP effects to check out
         - lens effect
         - emboss
@@ -17,6 +16,7 @@ effects.py
         - glass tile
         - photocopy
         - predator
+    - [DONE 1906/18] fix PowerThreshold
 
 auto.py
     - ShiftingSheets

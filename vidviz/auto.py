@@ -5,18 +5,16 @@ heavily from the simpler effects found in viztools.py
 
 from __future__ import print_function
 from __future__ import division
-
 from os import listdir
 from os.path import join, isfile
 import cv2
 import numpy as np
+from vidviz.effects import Effect
+from vidviz.utils import SmoothNoise
+from vidviz.utils import resize
 
-import effects
-import utils as util
-import cvutils as cvutil
 
-
-class HueSwirlChain(effects.Effect):
+class HueSwirlChain(Effect):
     """
     Create bloom effect around thresholded version of input frame then melt it
     with iteratively applying blur kernels. Iterative blur occurs 
@@ -33,10 +31,10 @@ class HueSwirlChain(effects.Effect):
         ,/. - decrease/increase final masking offset value
         lr arrows - decrease/increase offset in background huespace
         / - reset parameters
-        spacebar - quit hueswirlchain (transition to new input source)
+        spacebar - quit hue-swirl-chain (transition to new input source)
     """
 
-    def __init__(self, frame_width, frame_height):
+    def __init__(self, frame_height, frame_width):
 
         super(HueSwirlChain, self).__init__()
         self.name = 'hue-swirl-chain'
@@ -109,7 +107,7 @@ class HueSwirlChain(effects.Effect):
             'step': 5,
             'inc': False,
             'dec': False}
-        self.max_NUM_STYLES = 2
+        self.MAX_NUM_STYLES = 2
 
         # combine dicts into a list for easy general access
         self.props = [
@@ -126,7 +124,7 @@ class HueSwirlChain(effects.Effect):
         self.reinitialize = False
         self.random_walk = True
         self.chan_vec_pos = np.zeros((1, 1))
-        self.noise = util.SmoothNoise(
+        self.noise = SmoothNoise(
             num_samples=10,
             num_channels=self.chan_vec_pos.size)
 
@@ -134,7 +132,8 @@ class HueSwirlChain(effects.Effect):
         self.frame_height = frame_height
 
         # get source images
-        source_dir = '/home/mattw/Dropbox/Dropbox/gihub/vid-viz/data/deep-dream/'
+        source_dir = \
+            '/home/mattw/Dropbox/Dropbox/github/vid-viz/data/deep-dream/'
         self.file_list = [join(source_dir, f) for f in listdir(source_dir)
                           if isfile(join(source_dir, f))]
         self.num_files = len(self.file_list)
@@ -162,10 +161,10 @@ class HueSwirlChain(effects.Effect):
         self.curr_frame_index = 0
         self.file_index = 0
         frame_0 = cv2.imread(self.file_list[self.file_index])
-        frame_0 = cvutil.resize(frame_0, self.frame_width, self.frame_height)
+        frame_0 = resize(frame_0, self.frame_width, self.frame_height)
         self.file_index += 1
         frame_1 = cv2.imread(self.file_list[self.file_index])
-        frame_1 = cvutil.resize(frame_1, self.frame_width, self.frame_height)
+        frame_1 = resize(frame_1, self.frame_width, self.frame_height)
         self.file_index += 1
         self.frame = [frame_0, frame_1]
 
@@ -254,7 +253,7 @@ class HueSwirlChain(effects.Effect):
                 (hw[1]/2, hw[0]/2))
             self.frame[self.curr_frame_index] = temp_frame
 
-            self.frame[self.curr_frame_index] = cvutil.resize(
+            self.frame[self.curr_frame_index] = resize(
                 self.frame[self.curr_frame_index],
                 self.frame_width,
                 self.frame_height)
@@ -420,7 +419,160 @@ class HueSwirlChain(effects.Effect):
         if (self.update_output != 4) and (self.update_output != 5):
             super(HueSwirlChain, self).print_update(force=force)
 
-    def print_extra_updates(self):
-        print('q - quit %s effect' % self.name)
-        print('~ - enable border effects')
-        print('spacebar - cycle through sources')
+
+class Ball(object):
+    """Helper class for BouncingBalls class"""
+
+    def __init__(self, radius, center, velocity, frame_size):
+
+        self.rad = radius
+        self.pos = center
+        self.vel = velocity
+        self.frame_size = frame_size
+
+    def update_position(self):
+        for i in range(3):
+            self.pos[i] += self.vel[i]
+            if self.pos[i] + self.rad >= self.frame_size[i]:
+                # set position to border
+                self.pos[i] = self.frame_size[i] - self.rad
+                # reverse velocity
+                self.vel[i] *= -1
+            elif self.pos[i] - self.rad <= 0:
+                # set postion to border
+                self.pos[i] = self.rad
+                # reverse velocity
+                self.vel[i] *= -1
+
+    def draw(self, frame):
+        # note that center arg has reversed height/width ordering (grrr)
+        cv2.circle(
+            img=frame, center=(self.pos[1], self.pos[0]), radius=self.rad,
+            color=(255, 255, 255), thickness=-1)
+        # return frame
+
+
+class BouncingBalls(Effect):
+    """
+    Circles that bounce around in frame 
+
+    KEYBOARD INPUTS:
+        t - toggle between effect types
+        w - toggle random walk [currently not used]
+        a - toggle automatic behavior (vs keyboard input) [currently not used]
+        -/+ - decrease/increase number of balls
+        [/] - decrease/increase mean of ball radius (drawn from distribution)
+        ;/' - None
+        ,/. - None
+        lr arrows - None
+        / - reset parameters
+        spacebar - quit bouncing-balls (transition to new input source)
+    """
+
+    def __init__(self, frame_height, frame_width):
+
+        super(BouncingBalls, self).__init__()
+        self.name = 'bouncing-balls'
+
+        # user option constants
+        NUM_BALLS = {
+            'desc': 'number of balls',
+            'name': 'num_balls',
+            'val': 4,
+            'init': 4,
+            'min': 1,
+            'max': 32,
+            'mod': self.inf,
+            'step': 1,
+            'inc': False,
+            'dec': False}
+        BALL_RADIUS = {
+            'desc': 'ball radius in pixels',
+            'name': 'ball_radius',
+            'val': 100,
+            'init': 100,
+            'min': 50,
+            'max': 500,
+            'mod': self.inf,
+            'step': 10,
+            'inc': False,
+            'dec': False}
+        self.MAX_NUM_STYLES = 2  #
+
+        # combine dicts into a list for easy general access
+        self.props = [
+            NUM_BALLS,
+            BALL_RADIUS,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict,
+            self.none_dict]
+
+        # user options
+        self.style = 0
+        self.auto_play = True
+        self.reinitialize = False
+        self.random_walk = False
+        self.chan_vec_pos = np.zeros((1, 1))
+        self.noise = SmoothNoise(
+            num_samples=10,
+            num_channels=self.chan_vec_pos.size)
+
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+
+        # intialize other parameters
+        self.reset()
+
+    def reset(self):
+
+        # reset base class attributes
+        super(BouncingBalls, self).reset()
+
+        self.auto_play = False
+
+        # ball parameters
+        self.balls = []
+        for _ in range(self.props[0]['val']):
+            ball_rad = np.random.randint(50, 150)
+            lower_height = ball_rad + 1
+            upper_height = self.frame_height - ball_rad - 1
+            lower_width = ball_rad + 1
+            upper_width = self.frame_width - ball_rad - 1
+            ball_pos = [
+                np.random.randint(lower_height, upper_height),
+                np.random.randint(lower_width, upper_width),
+                0]
+            ball_vel = [np.random.randint(-8, 8), np.random.randint(-8, 8), 0]
+            frame_size = [self.frame_height, self.frame_width, 0]
+            self.balls.append(Ball(
+                radius=ball_rad, center=ball_pos, velocity=ball_vel,
+                frame_size=frame_size))
+
+    def process(self, key_list, key_lock=False):
+
+        # process keyboard input
+        if not key_lock:
+            self._process_io(key_list)
+
+        if self.reinitialize:
+            self.reinitialize = False
+            for index, _ in enumerate(self.props):
+                self.props[index]['val'] = self.props[index]['init']
+
+        # human-readable names
+        # num_balls = self.props[0]['val']
+        # ball_radius = self.props[1]['val']
+
+        # draw circles on black background
+        frame = np.zeros(
+            shape=(self.frame_height, self.frame_width), dtype='uint8')
+        for ball in self.balls:
+            ball.update_position()
+            ball.draw(frame)
+
+        return frame
+
+    def print_update(self, force=False):
+        """Print effect settings to console if not changed automatically"""
+        super(BouncingBalls, self).print_update(force=force)
